@@ -1,10 +1,12 @@
 #!/bin/bash
 # 生成/刷新离线包 dist/K100LC-RT4-offline：应用 + 权重 + **DCU 驱动**（+ 可选镜像）。
 #
-#   bash scripts/make_dist.sh              # 源码 + 预编译 rt + 权重 + 驱动（约 15.5GB）
-#   bash scripts/make_dist.sh --app-only   # 只同步源码/脚本/二进制，不动权重
-#   NO_DRIVER=1 bash scripts/make_dist.sh  # 不带驱动（约 15GB）
-#   WITH_IMAGE=1 bash scripts/make_dist.sh # 额外 docker save DTK 镜像（约 35GB，很慢）
+#   bash scripts/make_dist.sh               # 源码 + 预编译 rt + 权重 + 驱动（约 15.5GB）
+#   bash scripts/make_dist.sh --src-only    # 源码 + 驱动，**不带 RT4 权重**（约 160MB，
+#                                           #   目标机联网自己拉源模型并本地量化）
+#   bash scripts/make_dist.sh --app-only    # 只同步源码/脚本/二进制，不动权重
+#   NO_DRIVER=1 bash scripts/make_dist.sh   # 不带驱动
+#   WITH_IMAGE=1 bash scripts/make_dist.sh  # 额外 docker save DTK 镜像（约 35GB，很慢）
 #
 # 说明：权重一律用「真实文件」拷进包里（先写 .tmp 再 mv，避免和仓库里的
 # models/ 共用 inode）。这样离线包可以单独拷走/打包，不会因为主仓库删改而变。
@@ -21,7 +23,13 @@ source "$(dirname "$0")/env.sh"
 
 APP_ONLY=0
 [ "${1:-}" = "--app-only" ] && APP_ONLY=1
-DIST="$RT_ROOT/dist/K100LC-RT4-offline"
+SRC_ONLY=0
+[ "${1:-}" = "--src-only" ] && SRC_ONLY=1
+if [ "$SRC_ONLY" = "1" ]; then
+  DIST="$RT_ROOT/dist/K100LC-RT4-src"
+else
+  DIST="$RT_ROOT/dist/K100LC-RT4-offline"
+fi
 APP="$DIST/app"
 SRC="$RT_MODEL_DIR"
 # 驱动安装包/说明所在目录（默认找桌面上的 k100lc资料，可用 RT_DRIVER_SRC 覆盖）
@@ -51,8 +59,16 @@ echo "== [2/5] 放预编译运行时 build/rt =="
 [ -x "$RT_ROOT/build/rt" ] || { echo "先跑 bash scripts/build_rt.sh" >&2; exit 1; }
 cp -p "$RT_ROOT/build/rt" "$APP/build/rt"
 
-if [ "$APP_ONLY" = "1" ]; then
-  echo "== 跳过权重（--app-only） =="
+if [ "$APP_ONLY" = "1" ] || [ "$SRC_ONLY" = "1" ]; then
+  if [ "$SRC_ONLY" = "1" ]; then
+    echo "== 跳过权重（--src-only：目标机用 bootstrap.sh 联网下载 + 本地量化） =="
+    # 顺手清掉上一轮留下的 RT4 产物，保证这个包真的「不带模型」
+    rm -f "$APP/models/Qwen3.8-27B-NVFP4/rt4/"*.rt4 \
+          "$APP/models/Qwen3.8-27B-NVFP4/rt4/"*.rt4.json
+    mkdir -p "$APP/models/Qwen3.8-27B-NVFP4/rt4"
+  else
+    echo "== 跳过权重（--app-only） =="
+  fi
 else
   echo "== [3/5] 拷贝权重（真实文件，13.9+0.22+0.92GB） =="
   need=$((16 * 1024 * 1024))            # 16GB，单位 KB
@@ -219,6 +235,142 @@ exec bash "$HERE/app/scripts/serve.sh" "$@"
 EOF
 chmod +x "$DIST/start.sh"
 
+if [ "$SRC_ONLY" = "1" ]; then
+cat > "$DIST/bootstrap.sh" <<'EOF'
+#!/bin/bash
+# 首次引导：联网拉 DTK 镜像 + 下载 NVFP4 源模型 + 本地量化成 RT4。
+#
+#   bash bootstrap.sh               # 全流程（体检 → 镜像 → 模型+量化 → 视觉塔 → 自检）
+#   bash bootstrap.sh --no-vision   # 不导出视觉塔（网页就不能看图）
+#   bash bootstrap.sh --check       # 只体检，不下载不转换
+#
+# 需要联网：harbor.sourcefind.cn:5443（DTK 镜像，约 35GB）、modelscope.cn
+# （unsloth/Qwen3.8-27B-NVFP4，22.57GB + MTP 0.85GB）。
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+APP="$HERE/app"
+cd "$APP"
+source scripts/env.sh
+
+VISION=1; CHECK=0
+for a in "$@"; do
+  case "$a" in
+    --no-vision) VISION=0 ;;
+    --check) CHECK=1 ;;
+    *) echo "未知参数：$a" >&2; exit 2 ;;
+  esac
+done
+
+say()  { printf '\n\033[1m== %s ==\033[0m\n' "$*"; }
+need() { command -v "$1" >/dev/null 2>&1 || { echo "缺少 $1，请先安装" >&2; exit 1; }; }
+
+say "1/5 体检（驱动 / 依赖）"
+need docker; need python3; need gcc; need curl
+if [ -e /dev/kfd ]; then echo "  OK   /dev/kfd"; else
+  echo "  NG   没有 /dev/kfd → 驱动没装好，见 $HERE/driver/INSTALL.md"; fi
+if [ -x /opt/hyhal/bin/hy-smi ]; then
+  /opt/hyhal/bin/hy-smi 2>&1 | sed -n '4,6p' | sed 's/^/  /'
+else
+  echo "  NG   /opt/hyhal 缺失 → 见 $HERE/driver/INSTALL.md"
+fi
+if [ "$CHECK" = "1" ]; then echo; echo "（--check：到此为止）"; exit 0; fi
+
+say "2/5 DTK 容器镜像（约 35GB）"
+IMGS="$(docker images 2>/dev/null || true)"
+[ -z "$IMGS" ] && IMGS="$(sudo_rt docker images 2>/dev/null || true)"
+if printf '%s' "$IMGS" | awk -v p="${RT_IMG##*/}" 'index($0,p){f=1} END{exit !f}'; then
+  echo "  OK   已有 ${RT_IMG##*/}"
+else
+  shopt -s nullglob
+  tars=("$HERE"/image/*.tar)
+  shopt -u nullglob
+  if [ ${#tars[@]} -gt 0 ]; then
+    for t in "${tars[@]}"; do echo "  从 $t 载入"; sudo_rt docker load -i "$t"; done
+  else
+    echo "  docker pull $RT_IMG"
+    sudo_rt docker pull "$RT_IMG"
+  fi
+fi
+
+say "3/5 下载 NVFP4 源模型 + 本地量化（22.57GB + 0.85GB；转换约 4.5 分钟）"
+bash scripts/convert_weights.sh
+
+if [ "$VISION" = "1" ]; then
+  say "4/5 导出视觉塔 RT4（约 0.93GB，1~2 分钟）"
+  bash scripts/prepare_vision.sh
+else
+  say "4/5 跳过视觉塔（--no-vision）"
+fi
+
+say "5/5 自检"
+bash scripts/test_tools.sh | tail -3
+bash "$HERE/status.sh"
+cat <<'EOT'
+
+下一步：
+  bash start.sh                 # 起服务（网页 http://<本机IP>:8080/）
+  bash start.sh --stop          # 停服务
+EOT
+EOF
+chmod +x "$DIST/bootstrap.sh"
+
+cat > "$DIST/README-FIRST-RUN.md" <<'EOF'
+# K100LC-RT4（源码 + 驱动，不带 RT4 权重）
+
+这个包**不含量化好的 RT4 权重**：目标机器联网自己拉源模型并本地量化。适合「带宽够、
+想把权重在自己机器上生成一遍」的场景；要开箱即用（含 15GB 权重）请用另一个离线包。
+
+```
+K100LC-RT4-src/
+├── app/               源码 + 脚本 + 工具 + 文档 + 预编译 build/rt（无 RT4 权重）
+├── driver/            DCU 驱动：修正版安装包 + 预编译 /usr/local/hyhal + udev/服务 + 现场快照
+├── bootstrap.sh       首次引导：体检 → 拉镜像 → 下载源模型 → 本地量化 → 视觉塔 → 自检
+├── start.sh           起服务（OpenAI 兼容 + 网页，默认 8080）
+├── status.sh          自检
+└── README-OFFLINE.md  包结构说明
+```
+
+## 目标机器上的顺序
+
+```bash
+# 0) 驱动（必做，用「内核68修正」包；装完锁内核并重启，细节见 driver/INSTALL.md）
+sudo bash driver/installer/rock-*.aio.run && sudo reboot
+/opt/hyhal/bin/hy-smi
+
+# 1) 首次引导（要联网；约 25GB 下载 + 35GB 镜像）
+bash bootstrap.sh
+
+# 2) 起服务
+bash start.sh
+```
+
+## 会下载/生成什么，需要多少磁盘与时间
+
+| 步骤 | 内容 | 体积 | 备注 |
+|---|---|---|---|
+| DTK 容器镜像 | `harbor.sourcefind.cn:5443/...` | ≈35GB | 编译与运行都靠它；也可放 `image/*.tar` 让脚本 `docker load` |
+| 源模型 | `unsloth/Qwen3.8-27B-NVFP4`（safetensors + MTP） | 22.57GB + 0.85GB | 走魔搭，多连接下载 + sha256 校验（`tools/fetch_par2.py`） |
+| 量化产物 | `rt4/qwen38_27b.rt4` + MTP | 13.91GB + 0.22GB | 本地 `tools/convert.c` 量化，约 **4.5 分钟** |
+| 视觉塔 | `rt4/qwen38_27b_vision.rt4` | 0.93GB | `--no-vision` 可跳过（跳过就不能在网页看图） |
+
+**磁盘**：源模型 23.4GB + RT4 15GB + 镜像 35GB ≈ **75GB**（`--no-vision` 省 1GB；不需要
+源模型时常驻的话可以删掉 `app/models/Qwen3.8-27B-NVFP4/model*.safetensors`）。
+**依赖**：docker、python3、gcc、curl（量化在宿主机跑，不需要 DTK 工具链）。
+
+## 网络
+
+* 镜像：`harbor.sourcefind.cn:5443`（海光官方 harbor；如需账号见海光开发者平台）
+* 模型：`modelscope.cn`（脚本默认走魔搭；`hf-mirror` 单连接只有 200KB/s 且会 302 到被墙 CDN）
+
+完全离线的机器请用另一个包（`K100LC-RT4-offline-*.tar.zst`，含权重）。
+
+## 许可
+
+`app/` 里的代码是本项目的（Apache-2.0，见 `app/LICENSE`）；`driver/` 与镜像属于海光/DCU
+第三方内容，源模型与 DTK 镜像遵循各自许可，请自行下载、按许可使用。
+EOF
+fi
+
 cat > "$DIST/status.sh" <<'EOF'
 #!/bin/bash
 # 离线包自检：驱动 / 设备 / 权重 / 镜像 / 容器，能一眼看出缺哪一块。
@@ -252,16 +404,21 @@ fi
 echo "== 应用 / 权重 =="
 [ -x "$APP/build/rt" ] && ok "build/rt 可执行" || bad "build/rt 缺失（重新解包）"
 RT4="$APP/models/Qwen3.8-27B-NVFP4/rt4"
-for f in qwen38_27b.rt4 qwen38_27b_mtp.rt4 qwen38_27b_vision.rt4; do
-  if [ -f "$RT4/$f" ]; then
-    ok "$(printf '%-28s %s' "$f" "$(du -h "$RT4/$f" | cut -f1)")"
-  else
-    warn "$f 不在包里（MTP/视觉可选，主权重必须在）"
-  fi
-done
-[ -f "$RT4/qwen38_27b.rt4.json" ] && ok "RT4 manifest 在" || bad "qwen38_27b.rt4.json 缺失"
+if [ ! -f "$RT4/qwen38_27b.rt4" ] && [ -f "$HERE/bootstrap.sh" ]; then
+  warn "还没量化出 RT4 —— 这是「源码+驱动」包，先跑：bash $HERE/bootstrap.sh"
+  warn "（它会联网拉 DTK 镜像、下载 NVFP4 源模型 22.57GB 并本地量化，约 25GB 下载量）"
+else
+  for f in qwen38_27b.rt4 qwen38_27b_mtp.rt4 qwen38_27b_vision.rt4; do
+    if [ -f "$RT4/$f" ]; then
+      ok "$(printf '%-28s %s' "$f" "$(du -h "$RT4/$f" | cut -f1)")"
+    else
+      warn "$f 不在包里（MTP/视觉可选，主权重必须在）"
+    fi
+  done
+  [ -f "$RT4/qwen38_27b.rt4.json" ] && ok "RT4 manifest 在" || bad "qwen38_27b.rt4.json 缺失"
+fi
 
-if [ "$FULL" = "1" ]; then
+if [ "$FULL" = "1" ] && [ -f "$RT4/qwen38_27b.rt4" ]; then
   echo "== 权重 sha256（--full） =="
   ( cd "$RT4" && sha256sum qwen38_27b.rt4 ) | sed 's/^/  /'
 fi
@@ -336,6 +493,10 @@ echo
 echo "入口文件：start.sh / status.sh / README-OFFLINE.md"
 echo "离线包就绪：$DIST"
 echo "  体积（含硬链接去重后的真实占用）：$(du -sh "$DIST" | cut -f1)"
-echo "  权重校验（links 应为 1，表示是独立文件）："
-stat -c '    %h links  %s bytes  %n' "$APP/models/Qwen3.8-27B-NVFP4/rt4/qwen38_27b.rt4"
+if [ -f "$APP/models/Qwen3.8-27B-NVFP4/rt4/qwen38_27b.rt4" ]; then
+  echo "  权重校验（links 应为 1，表示是独立文件）："
+  stat -c '    %h links  %s bytes  %n' "$APP/models/Qwen3.8-27B-NVFP4/rt4/qwen38_27b.rt4"
+else
+  echo "  本包不含 RT4 权重（--src-only）：目标机执行 bash bootstrap.sh 联网下载 + 本地量化"
+fi
 echo "  自检：bash $DIST/status.sh（目标机上）/ 起服务：bash $DIST/start.sh"
