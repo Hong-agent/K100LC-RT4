@@ -150,6 +150,7 @@ bash scripts/dsh.sh 'python3 tools/verify_plain.py \
 > `bash scripts/make_host_runtime.sh` 现场抽取。
 > 之后可用 `bash scripts/chat_host.sh` / `bash scripts/serve_host.sh` 在主机直接跑；
 > 编译新算子仍然需要 DTK 的 `hipcc`。
+> 离线一键包会在 `runtime/python` 里带独立 CPython 3.10，目标机不需要装 Python。
 
 服务请求体可加 `"mtp": 0..3` 临时覆盖草稿数（0 即普通逐 token 解码），例如
 `{"messages":[...],"max_tokens":64,"mtp":0}`。

@@ -18,6 +18,12 @@ source "$ROOT/scripts/env.sh"
 RUNTIME="${RT_HOST_RUNTIME:-$ROOT/runtime}"
 LIBS="${RT_HOST_LIBS:-$RUNTIME/dtk-libs}"
 PY="${RT_HOST_PY:-$RUNTIME/py}"
+PYBIN="${RT_PYTHON:-python3}"
+if [ -z "${RT_PYTHON:-}" ] && [ -x "$ROOT/runtime/python/bin/python3.10" ]; then
+  export PYTHONHOME="$ROOT/runtime/python"
+  export LD_LIBRARY_PATH="$ROOT/runtime/python/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+  PYBIN="$ROOT/runtime/python/bin/python3.10"
+fi
 
 MODE=all
 case "${1:-}" in
@@ -61,7 +67,7 @@ check_runtime() {
 
   if [ "$need_python" = 1 ]; then
     echo "[check] Python 依赖"
-    if PYTHONPATH="$PY" python3 -c 'import fastapi, h11, jinja2, multipart, pydantic, starlette, tokenizers, uvicorn' 2>/dev/null; then
+    if PYTHONPATH="$PY" "$PYBIN" -c 'import fastapi, h11, jinja2, multipart, numpy, PIL, pydantic, starlette, tokenizers, uvicorn' 2>/dev/null; then
       echo "  import 通过"
     else
       echo "  尚未抽取 $PY（或版本不匹配）" >&2
@@ -117,7 +123,7 @@ fi
 
 if [ "$MODE" = all ] || [ "$MODE" = python ]; then
   if [ -e "$PY/tokenizers/__init__.py" ] && PYTHONPATH="$PY" \
-      python3 -c 'import fastapi, jinja2, tokenizers, uvicorn' >/dev/null 2>&1; then
+      "$PYBIN" -c 'import fastapi, jinja2, numpy, PIL, tokenizers, uvicorn' >/dev/null 2>&1; then
     echo "[python] 已有，跳过"
   else
     echo "[python] 从镜像抽取容器里已验证过的版本"
@@ -132,6 +138,7 @@ if [ "$MODE" = all ] || [ "$MODE" = python ]; then
         jinja2 jinja2-* markupsafe markupsafe-* multipart \
         pydantic pydantic-[0-9]* pydantic_core pydantic_core-[0-9]* \
         python_multipart python_multipart-* sniffio sniffio-* \
+        numpy numpy.libs numpy-* PIL pillow.libs pillow-* \
         starlette starlette-* tokenizers tokenizers-* \
         typing_extensions.py typing_extensions-* \
         typing_inspection typing_inspection-* uvicorn uvicorn-*; do

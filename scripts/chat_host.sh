@@ -6,4 +6,4 @@
 set -euo pipefail
 source "$(dirname "$0")/host_env.sh"
 cd "$RT_ROOT"
-exec python3 scripts/chat.py "$@"
+exec "${RT_PYTHON:-python3}" scripts/chat.py "$@"

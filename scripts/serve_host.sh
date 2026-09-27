@@ -70,12 +70,12 @@ fi
 mkdir -p "$RT_HOST_RUNTIME"
 if command -v setsid >/dev/null 2>&1; then
   # setsid 让它脱离当前进程组；PID 在子 shell 里写，避免 setsid fork 后 $! 失真。
-  setsid bash -c 'echo $$ >"$1"; shift; exec python3 "$@"' _ "$PIDFILE" \
+  setsid bash -c 'echo $$ >"$1"; shift; exec "$RT_PYTHON" "$@"' _ "$PIDFILE" \
     scripts/serve.py --port "$PORT" --ctx "$CTX" \
     --default-max-tokens "$DEFAULT_MAX_TOKENS" --mtp-n "$MTP_N" $NO_MTP_FLAG \
     >"$LOGFILE" 2>&1 </dev/null &
 else
-  nohup python3 scripts/serve.py --port "$PORT" --ctx "$CTX" \
+  nohup "$RT_PYTHON" scripts/serve.py --port "$PORT" --ctx "$CTX" \
     --default-max-tokens "$DEFAULT_MAX_TOKENS" --mtp-n "$MTP_N" $NO_MTP_FLAG \
     >"$LOGFILE" 2>&1 </dev/null &
   echo "$!" >"$PIDFILE"

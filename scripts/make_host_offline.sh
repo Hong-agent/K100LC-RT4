@@ -19,6 +19,11 @@ MODEL_DIR="$APP/models/Qwen3.8-27B-NVFP4"
 RT4="$MODEL_DIR/rt4"
 
 [ -x "$ROOT/build/rt" ] || { echo "缺少 build/rt" >&2; exit 1; }
+if [ ! -x "$ROOT/runtime/python/bin/python3.10" ] || \
+   [ ! -d "$ROOT/runtime/py/numpy" ] || [ ! -d "$ROOT/runtime/py/PIL" ]; then
+  echo "== 准备自带 Python / numpy / Pillow =="
+  bash "$ROOT/scripts/bundle_python_runtime.sh"
+fi
 for f in qwen38_27b.rt4 qwen38_27b.rt4.json qwen38_27b_mtp.rt4 \
          qwen38_27b_vision.rt4 qwen38_27b_vision.rt4.json; do
   [ -f "$RT4/$f" ] || { echo "离线包缺少权重：$RT4/$f（先用 make_dist.sh 生成）" >&2; exit 1; }
@@ -38,9 +43,10 @@ done
 cp -p "$ROOT/build/rt" "$APP/build/rt"
 
 echo "== 同步主机直跑运行库 =="
-mkdir -p "$APP/runtime/dtk-libs" "$APP/runtime/py"
+mkdir -p "$APP/runtime/dtk-libs" "$APP/runtime/py" "$APP/runtime/python"
 cp -a "$ROOT/runtime/dtk-libs/." "$APP/runtime/dtk-libs/"
 cp -a "$ROOT/runtime/py/." "$APP/runtime/py/"
+cp -a "$ROOT/runtime/python/." "$APP/runtime/python/"
 
 echo "== 同步模型元数据（权重已在离线包内，不重复拷 22GB 源权重） =="
 for f in config.json generation_config.json tokenizer.json vocab.json chat_template.jinja; do
@@ -137,12 +143,13 @@ bash start.sh      # 默认 80 端口；局域网直接访问 http://<本机IP>/
 - 停止：`bash start.sh --stop`
 - 改端口：`PORT=8080 bash start.sh`
 
-视觉塔默认在 CPU 上运行（`RT_VISION_DEVICE=cpu`），不占用 DCU，也不需要
-torch/transformers；文本模型仍在 DCU 上跑。
+包内自带独立 Python 3.10、numpy、Pillow 和 Web 依赖；目标机不需要预装
+Python。视觉塔默认在 CPU 上运行（`RT_VISION_DEVICE=cpu`），不占用 DCU，
+也不需要 torch/transformers；文本模型仍在 DCU 上跑。
 
 ```
 K100LC-RT4-offline/
-├── app/        源码 + 预编译 build/rt + 运行库 + RT4 权重
+├── app/        源码 + build/rt + 自带 Python/运行库 + RT4 权重
 ├── driver/     DCU 驱动安装包 / 预编译 hyhal / udev / 服务 / 快照
 ├── start.sh    主机直跑一键启动
 └── status.sh   自检
@@ -170,8 +177,10 @@ fi
 
 mkdir -p "$OUT_DIR"
 echo "== 压缩到 $ARCHIVE =="
+TMP_ARCHIVE="$ARCHIVE.tmp"
 tar -C "$(dirname "$DIST")" -cf - "$(basename "$DIST")" | \
-  zstd -T0 -3 -q -f -o "$ARCHIVE"
+  zstd -T0 -3 -q -f -o "$TMP_ARCHIVE"
+mv -f "$TMP_ARCHIVE" "$ARCHIVE"
 (
   cd "$OUT_DIR"
   sha256sum "$(basename "$ARCHIVE")" > "$(basename "$ARCHIVE").sha256"

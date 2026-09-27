@@ -101,6 +101,8 @@ bash scripts/serve_host.sh --stop
    `numpy` / `PIL` 和视觉 RT4 权重，不需要 torch/transformers，也不会把视觉塔
    加载到 DCU；典型 91-token 图片编码约 4 秒。想改回 GPU/HIP 可设
    `RT_VISION_DEVICE=gpu`，此时需要容器里的 torch/transformers 预处理环境。
+   离线一键包还会带独立 Python 3.10、numpy 和 Pillow（`runtime/python` +
+   `runtime/py`），目标机不需要预装 Python。
 4. **PDF 抽取是基础版。** 容器里有 `pypdf` 时走完整解析；主机抽取包没带它，
    `serve.py` 会自动退回内置提取器。
 

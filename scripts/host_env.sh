@@ -21,6 +21,18 @@ export RT_HOST_RUNTIME="${RT_HOST_RUNTIME:-$RT_ROOT/runtime}"
 export RT_HOST_LIBS="${RT_HOST_LIBS:-$RT_HOST_RUNTIME/dtk-libs}"
 export RT_HOST_PY="${RT_HOST_PY:-$RT_HOST_RUNTIME/py}"
 
+# 离线包会带一份独立 Python 3.10；有它就优先使用，完全不依赖系统 Python。
+export RT_BUNDLED_PY="${RT_BUNDLED_PY:-$RT_HOST_RUNTIME/python}"
+_rt_py_prefix=""
+if [ -x "$RT_BUNDLED_PY/bin/python3.10" ] && [ -z "${RT_PYTHON:-}" ]; then
+  export RT_PYTHON="$RT_BUNDLED_PY/bin/python3.10"
+  export PYTHONHOME="$RT_BUNDLED_PY"
+  export PATH="$RT_BUNDLED_PY/bin:$PATH"
+  _rt_py_prefix="$RT_BUNDLED_PY/lib:"
+else
+  export RT_PYTHON="${RT_PYTHON:-python3}"
+fi
+
 # 与 scripts/env.sh 对齐的权重与产物路径
 export RT_MODEL_DIR="${RT_MODEL_DIR:-$RT_ROOT/models/Qwen3.8-27B-NVFP4}"
 export RT_RT4="${RT_RT4:-$RT_MODEL_DIR/rt4/qwen38_27b.rt4}"
@@ -31,7 +43,7 @@ export RT_VISION_RT4="${RT_VISION_RT4:-$RT_MODEL_DIR/rt4/qwen38_27b_vision.rt4}"
 # `build/rt` 的 RUNPATH 写死为 /opt/dtk/{hip,lib}；主机没有 /opt/dtk，所以必须用
 # LD_LIBRARY_PATH 把抽出的运行库放在前面。HSA 运行时来自 /opt/hyhal。
 if [ -d "$RT_HOST_LIBS/hip" ] && [ -d "$RT_HOST_LIBS/comgr" ]; then
-  export LD_LIBRARY_PATH="$RT_HOST_LIBS/hip:$RT_HOST_LIBS/comgr:/opt/hyhal/lib:/opt/hyhal/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+  export LD_LIBRARY_PATH="${_rt_py_prefix}$RT_HOST_LIBS/hip:$RT_HOST_LIBS/comgr:/opt/hyhal/lib:/opt/hyhal/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 else
   echo "[host_env] 缺少主机运行库，先运行: bash scripts/make_host_runtime.sh" >&2
 fi
