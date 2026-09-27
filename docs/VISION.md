@@ -4,8 +4,12 @@
 
 网页上传图片现在是**端到端可用**的：图片经 Qwen3.5 视觉塔编码后，作为
 `<|image_pad|>` 位置的词嵌入注入自研文本运行时，主模型直接基于图像 embedding 回答。
-视觉塔本身也是 RT4：线性层 f16，norm/bias/pos_embed f32，27 层视觉块全部在
-自研 C++/HIP 运行时里执行；Python 只做图片预处理。
+视觉塔本身也是 RT4：线性层 f16，norm/bias/pos_embed f32，27 层视觉块可走
+两条路径：
+
+* `RT_VISION_DEVICE=gpu`：在自研 C++/HIP 运行时里执行，Python 只做预处理；
+* `RT_VISION_DEVICE=cpu`：在 NumPy 里执行，不依赖 torch/transformers/HIP；
+  主机直跑服务默认使用这条路径。
 
 实测（K100_LC，单卡）：
 
@@ -13,7 +17,9 @@
 |---|---|
 | 上传写着 `7788` 的图片，问“识别四位数字” | 回答 `7788` |
 | 一次上传 `12`、`34` 两张图，问按顺序读出 | 回答 `12\n34` |
-| 单图视觉编码（91 token，RT4/C++） | 约 242 ms/图 |
+| 单图视觉编码（91 token，RT4/HIP） | 约 242 ms/图 |
+| 单图视觉编码（91 token，NumPy/CPU） | 约 4.3 s/图 |
+| CPU vs GPU 最终 embedding | 余弦 `1.0000008`，相对误差 `6e-4` |
 | 流式输出 | 正常，SSE 增量中能看到 `7 / 7 / 8 / 8` |
 | MTP3 开启时 | 图片 prefill 后仍正常投机，实测接受 2~3 token/轮 |
 | 纯文本请求 | 不受影响，仍走原 `PREFILL` |
@@ -26,8 +32,8 @@ BF16，只有 0.92GB，27 层。实测把视觉线性层也压到 int4/128 后�
 
 所以 RT4 视觉权重采用 **f16 线性层 + f32 norm/bias/pos_embed**：
 
-* 仍然是独立的 RT4 文件，由同一个 C++ 运行时加载；
-* 视觉塔 27 层（patch embed、qkv/proj、MLP、merger）全部在 HIP 运行时执行；
+* 仍然是独立的 RT4 文件，GPU/CPU 两条路径读同一份权重；
+* 视觉塔 27 层（patch embed、qkv/proj、MLP、merger）由 HIP 或 NumPy 执行；
 * 与 transformers 参考逐层对齐：layer0/1 余弦 1.0，最终 embedding
   余弦 0.999998、相对误差约 0.18%。
 
@@ -53,7 +59,9 @@ models/Qwen3.8-27B-NVFP4/rt4/
 
 ## 4. 图像预处理
 
-使用 transformers 的 `Qwen2VLImageProcessor`，参数与视觉塔配置一致：
+GPU 路径使用 transformers 的 `Qwen2VLImageProcessor`；CPU 路径用
+`scripts/vision_cpu.py` 里的 PIL/NumPy 等价实现（与 HF 处理器相对误差约
+`6.5e-5`）。参数与视觉塔配置一致：
 
 * `patch_size=16`
 * `temporal_patch_size=2`
@@ -66,14 +74,15 @@ models/Qwen3.8-27B-NVFP4/rt4/
 
 ## 5. 运行时协议
 
-服务端先调用引擎：
+GPU 路径下，服务端先调用引擎：
 
 ```
 IMG_EMB <patch_file> <out_file> <gh> <gw>
 ```
 
 引擎在自己的 RT4 视觉塔上跑 27 层，把 `[num_vision_tokens, 5120]` f32 写到
-`out_file`，回 `OK image <N>`。
+`out_file`，回 `OK image <N>`。CPU 路径直接在 `serve.py` 进程里完成同样的
+27 层计算，不再发送 `IMG_EMB`，注入文本运行时的协议不变。
 
 文本模板把每张图片替换为：
 
@@ -96,15 +105,31 @@ prefill 时按全局 token 下标取交集，因此图片段跨 512-token chunk 
 
 * 默认 `RT_VISION_MODE=auto`：有 `rt4/qwen38_27b_vision.rt4` 就用本地视觉塔；
   同时配置了 `RT_VISION_BASE_URL` + `RT_VISION_MODEL` 时优先用外部视觉桥。
+* `RT_VISION_DEVICE=cpu`：NumPy/CPU 视觉塔；主机直跑服务默认值。
+* `RT_VISION_DEVICE=gpu`：HIP/GPU 视觉塔；容器版服务的默认值。
 * `RT_VISION_MODE=local`：强制本地。
 * `RT_VISION_MODE=off`：关闭视觉，图片只作为会话附件展示。
 * 相关变量：`RT_VISION_RT4`（自定义视觉 RT4 路径）、`RT_VISION_MAX_PATCHES`
   （默认 4096）、`RT_VISION_CACHE`（默认缓存 16 张图）。
 
-## 7. 已知边界
+## 7. CPU 实现
 
-* 视觉线性层是通用 f16 GEMM（64x64x32 tile），没有使用矩阵核心；后续可以
-  针对视觉形状继续调 tile / 双缓冲。
+`scripts/vision_cpu.py` 按 `src/model.cpp` 的 VisionModel / `src/k_vision.hip`
+逐层复刻：
+
+* RT4 权重用 `mmap` 读取；线性层按 GPU 内核语义先把激活和权重舍入到 f16，
+  再用 f32 累加；
+* 2D 位置插值、2D RoPE、全注意力、LayerNorm、GELU 和 merger 都在 NumPy 中实现；
+* 同一张普通图片（91 token）实测约 4.3 秒；图片越大线性增长。
+
+正确性对照：同一组 patch 的 CPU 与 GPU 最终 embedding 余弦 `1.0000008`，
+相对误差 `6e-4`；端到端上传 `7788` 图片能正确回答 `7788`。
+
+## 8. 已知边界
+
+* GPU 视觉线性层是通用 f16 GEMM（64x64x32 tile），没有使用矩阵核心；后续可以
+  针对视觉形状继续调 tile / 双缓冲。CPU 版没有矩阵核心，延迟明显高于 GPU。
 * 图片分辨率上限默认约 1MP；超大图会被 `Qwen2VLImageProcessor` 按长宽比缩放。
+  CPU 模式下大图会很慢，可按需调小 `RT_VISION_MAX_PIXELS`。
 * 多图 token 会占上下文：一张约 90 token 的图，prefill token 数增加约 90-1。
 * 复杂版式 OCR、细小文字仍取决于原模型视觉塔本身的能力。

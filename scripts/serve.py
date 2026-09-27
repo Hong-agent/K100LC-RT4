@@ -57,6 +57,7 @@ VISION_MODEL = os.environ.get('RT_VISION_MODEL', '')
 VISION_API_KEY = os.environ.get('RT_VISION_API_KEY', '')
 VISION_TIMEOUT = float(os.environ.get('RT_VISION_TIMEOUT', '120'))
 VISION_MODE = os.environ.get('RT_VISION_MODE', 'auto').lower()
+VISION_DEVICE = os.environ.get('RT_VISION_DEVICE', 'gpu').lower()
 VISION_RT4 = os.environ.get('RT_VISION_RT4', '')
 VISION_PROMPT = os.environ.get('RT_VISION_PROMPT') or (
     '请详细描述这张图片的内容，包括其中的文字、表格、图表、界面元素和关键细节。'
@@ -483,7 +484,8 @@ def _get_local_encoder():
             if _VISION_ENCODER is None:
                 from vision_encoder import LocalVisionEncoder
                 _VISION_ENCODER = LocalVisionEncoder(engine=ENGINE,
-                                                     vision_rt4=_vision_local_file())
+                                                     vision_rt4=_vision_local_file(),
+                                                     device=VISION_DEVICE)
     return _VISION_ENCODER
 
 
@@ -705,8 +707,10 @@ def capabilities():
         'text': True,
         'vision': _vision_ready(),
         'vision_backend': _vision_backend(),
+        'vision_device': (VISION_DEVICE if _vision_backend() == 'local' else None),
         'vision_model': (VISION_MODEL if _vision_backend() == 'external'
-                         else ('qwen3.5-vision-rt4' if _vision_backend() == 'local'
+                         else (('qwen3.5-vision-cpu' if VISION_DEVICE == 'cpu'
+                                else 'qwen3.5-vision-rt4') if _vision_backend() == 'local'
                                else None)),
         'document_extract': True,
         'context': CTX_LIMIT,                 # KV cache 容量（token）
@@ -1462,8 +1466,14 @@ def main():
     global ENGINE, CTX_LIMIT, DEFAULT_MAX_TOKENS
     CTX_LIMIT = args.ctx
     DEFAULT_MAX_TOKENS = args.default_max_tokens
-    ENGINE = Engine(log=True, ctx=args.ctx, mtp_n=args.mtp_n, no_mtp=args.no_mtp)
-    # 本地视觉前端会 import torch/transformers；后台预热，避免第一张图片白等十几秒。
+    engine_env = None
+    if VISION_DEVICE == 'cpu' and _vision_local_ready():
+        # CPU 视觉塔在 Python 里算；让引擎跳过 GPU 视觉权重加载。
+        engine_env = {'RT_VISION_RT4': '/nonexistent-k100lc-cpu-vision'}
+    ENGINE = Engine(log=True, ctx=args.ctx, mtp_n=args.mtp_n, no_mtp=args.no_mtp,
+                    env_extra=engine_env)
+    # 本地视觉前端按需加载：GPU 版 import torch/transformers，CPU 版只 import
+    # numpy/PIL。后台预热，避免第一张图片白等十几秒。
     if _vision_backend() == 'local':
         threading.Thread(target=_get_local_encoder, daemon=True).start()
     print(f'[serve] 模型就绪，监听 http://{args.host}:{args.port}/v1', flush=True)

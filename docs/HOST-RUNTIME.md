@@ -97,9 +97,10 @@ bash scripts/serve_host.sh --stop
 2. **运行依赖 DTK 的 `libgalaxyhip` 与 `libamd_comgr`。** 现有 `build/rt` 是
    对着这套 ABI 编的；要做到连这两个 `.so` 也不用，需要把算子改成直接对
    `/opt/hyhal` 的 HSA 接口重新编译/装载，那是另一条较大的改造路线。
-3. **本地视觉塔依赖 torch/transformers。** 主机默认 `RT_VISION_MODE=off`，
-   文本、文档提取、技能都正常；图片本地编码需要另行准备 torch/transformers，
-   或者配 `RT_VISION_BASE_URL` 走外部视觉桥。
+3. **本地视觉塔默认在 CPU 上跑。** 主机服务设置 `RT_VISION_DEVICE=cpu`，只依赖
+   `numpy` / `PIL` 和视觉 RT4 权重，不需要 torch/transformers，也不会把视觉塔
+   加载到 DCU；典型 91-token 图片编码约 4 秒。想改回 GPU/HIP 可设
+   `RT_VISION_DEVICE=gpu`，此时需要容器里的 torch/transformers 预处理环境。
 4. **PDF 抽取是基础版。** 容器里有 `pypdf` 时走完整解析；主机抽取包没带它，
    `serve.py` 会自动退回内置提取器。
 

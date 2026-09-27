@@ -52,12 +52,14 @@ class Engine:
     """rt --engine 子进程的薄封装。"""
 
     def __init__(self, model=None, json=None, cmd=None, log=None, ctx=None, mtp_n=None,
-                 no_mtp=False):
+                 no_mtp=False, env_extra=None):
         model = model or os.environ.get('RT_RT4',
                                         os.path.join(ROOT, 'models/Qwen3.8-27B-NVFP4/rt4/qwen38_27b.rt4'))
         json = json or os.environ.get('RT_RT4_JSON',
                                       os.path.join(ROOT, 'models/Qwen3.8-27B-NVFP4/rt4/qwen38_27b.rt4.json'))
         env = dict(os.environ)
+        if env_extra:
+            env.update(env_extra)
         if cmd is None:
             cmd = [os.path.join(ROOT, 'build', 'rt'), '--engine', '--model', model, '--json', json]
             if ctx:

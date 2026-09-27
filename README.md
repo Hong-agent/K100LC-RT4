@@ -162,9 +162,10 @@ bash scripts/dsh.sh 'python3 tools/verify_plain.py \
 * **文档**：可选/拖入 `txt/md/json/csv/html/xml/pdf/docx/pptx/xlsx/rtf/odt`
   及常见代码/日志文本；服务端 `POST /v1/extract` 提取为文本，再随消息送入 RT4。
   `pdf` 在容器装有 `pypdf` 时走完整解析，否则退回内置基础提取器。
-* **图片（本地视觉塔，默认）**：网页显示缩略图，视觉塔 27 层也统一成
-  RT4 权重并在自研 C++/HIP 运行时里执行；Python 只做图片预处理，把 patch
-  交给引擎 `IMG_EMB`，得到的 embedding 再通过 `PREFILL_EMB` 注入文本运行时。
+* **图片（本地视觉塔，默认）**：网页显示缩略图，视觉塔 27 层统一成 RT4
+  权重。`RT_VISION_DEVICE=gpu` 时在自研 C++/HIP 运行时执行；主机直跑服务默认
+  `RT_VISION_DEVICE=cpu`，用 NumPy 执行，不需要 torch/transformers，也不占
+  DCU。两条路径都把 embedding 通过 `PREFILL_EMB` 注入文本运行时。
   视觉权重从源 safetensors 导出：
 
 ```bash
@@ -172,9 +173,9 @@ bash scripts/prepare_vision.sh    # 产物 rt4/qwen38_27b_vision.rt4，约 0.93G
 bash scripts/serve.sh
 ```
 
-  视觉塔随 `build/rt` 在启动时加载；`/v1/capabilities` 会显示
-  `"vision_backend": "local"`。实测本地视觉塔能直接读图中文字（例：上传写着
-  `7788` 的图片，模型回答 `7788`），多图、流式、MTP 都通过。
+  `/v1/capabilities` 会显示 `"vision_backend": "local"` 和
+  `"vision_device": "gpu"|"cpu"`。实测本地视觉塔能直接读图中文字（例：上传
+  写着 `7788` 的图片，模型回答 `7788`），多图、流式、MTP 都通过。
 
 * **图片（外部视觉桥，可选）**：也可以改用一个 OpenAI 兼容的视觉端点，
   服务端会先把图片转成文字描述，再交给 RT4：
@@ -251,9 +252,9 @@ bash scripts/serve.sh
 已完成：
 
 * **本地视觉塔**：把 Qwen3.5 `model.visual.*` 转成独立 RT4（线性层 f16，
-  norm/bias/pos f32，约 0.93GB），27 层视觉块在自研 C++/HIP 运行时执行，
-  经 `PREFILL_EMB` 把图像 embedding 注入文本运行时；单图、多图、流式、MTP
-  与网页上传都已跑通。见 [docs/VISION.md](docs/VISION.md)。
+  norm/bias/pos f32，约 0.93GB），27 层视觉块可在自研 C++/HIP 或 NumPy/CPU
+  上执行，经 `PREFILL_EMB` 把图像 embedding 注入文本运行时；单图、多图、
+  流式、MTP 与网页上传都已跑通。见 [docs/VISION.md](docs/VISION.md)。
 * **权重链路**：源 22.57GB（sha256 与 hf-mirror 一致）→ RT4 13.91GB / 851 张量 / 4分37秒；
   与 BF16 原模型逐张量核对（线性层 RMS 比值 0.995~1.004），真实张量抽查相对误差正好等于
   声明的重量化误差（说明偏移/行序/分组无误）。MTP 头与 KV 尺度也一并产出。

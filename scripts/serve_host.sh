@@ -5,7 +5,7 @@
 #   PORT=18080 CTX=4096 MTP_N=0 bash scripts/serve_host.sh
 #   bash scripts/serve_host.sh --stop
 #
-# 主机默认没有 torch/transformers，所以本地视觉塔关闭；配了外部视觉桥会自动用 external。
+# 主机默认把视觉塔放在 CPU 上跑；配了外部视觉桥会自动用 external。
 set -euo pipefail
 source "$(dirname "$0")/host_env.sh"
 cd "$RT_ROOT"
@@ -17,6 +17,7 @@ PORT="${PORT:-80}"
 CTX="${CTX:-131072}"
 DEFAULT_MAX_TOKENS="${RT_DEFAULT_MAX_TOKENS:-128000}"
 MTP_N="${MTP_N:-${RT_MTP_N:-3}}"
+export RT_VISION_DEVICE="${RT_VISION_DEVICE:-cpu}"
 
 NO_MTP_FLAG=""
 if [ "${NO_MTP:-0}" != "0" ]; then NO_MTP_FLAG="--no-mtp"; fi
@@ -25,7 +26,7 @@ if [ -z "${RT_VISION_MODE:-}" ]; then
   if [ -n "${RT_VISION_BASE_URL:-}" ] && [ -n "${RT_VISION_MODEL:-}" ]; then
     export RT_VISION_MODE=external
   else
-    export RT_VISION_MODE=off
+    export RT_VISION_MODE=auto
   fi
 fi
 
