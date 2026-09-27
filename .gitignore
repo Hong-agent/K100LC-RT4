@@ -23,6 +23,9 @@ __pycache__/
 *.pyc
 .pytest_cache/
 
+# ---- 主机直跑运行库（从本地 DTK 镜像抽取，约 180MB） ----
+runtime/
+
 # ---- 编辑器 / 系统 ----
 .vscode/
 .idea/

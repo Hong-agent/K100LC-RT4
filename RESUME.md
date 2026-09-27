@@ -1,5 +1,33 @@
 # 接续说明（自研运行时线）
 
+## 状态（2026-09-27）：**开源到 GitHub：环境版本入库 + 驱动上传** ✅
+
+仓库：**<https://github.com/Hong-agent/K100LC-RT4>**（public，默认分支 `main`）
+
+这一轮补的两件事：
+
+1. **系统/环境版本写进仓库**：`scripts/collect_env.sh` 一条命令采集「发行版、内核、
+   已装内核、GRUB 默认项、CPU/内存、驱动包版本、内核模块版本与已加载列表、用户态驱动、
+   hymgr 状态、设备节点、hy-smi、docker 版本、DTK 镜像 tag/ID/构建时间、容器内
+   hipcc/python/gcc/torch/transformers、宿主 gcc/python、仓库提交与编译目标」，
+   输出 markdown；`docs/ENV.md` 就是它的产物，README/REPRODUCE 开头都指向它。
+   实测那台机器：Ubuntu 22.04.5 + 内核 6.8.0-40-generic + `rock-5.7.1 6.2.35` +
+   DTK 镜像 `…-dtk26.04-…-qwen3.8`（ID `3c65a645b134`，构建于 2026-08-17）+
+   容器内 dcc 25.10.0-0 / torch 2.10.0 / transformers 5.5.0 / gcc 11.4。
+2. **驱动上传**：`driver/` 目录入库（`INSTALL.md`、`manifest.txt`、内核68修正说明与
+   md5、`system/` 的 udev/modprobe/hymgr.service、`README.md`）；两个大二进制放在
+   Release **driver-rock-5.7.1** 里：
+   `rock-5.7.1-6.2.35-V1.6.7-kernel68-fix.aio.run`（70MB，md5
+   `6ce38851cd21478ab669c9ff6b5e45d2`）、`hyhal-prebuilt-6.8.0-40-generic.tar.gz`
+   （93MB，sha256 `98125070…97e2`）、以及源码+驱动整包
+   `K100LC-RT4-src-driver-2026-09-27.zip`（160MB）。
+
+**本机到 github.com 的 git-over-HTTPS 不通/极不稳**（`GnuTLS recv error`、`443 连接超时`），
+所以推送改用 **`scripts/push_via_api.py`**：按内容比对（blob sha 相同就跳过）走 Git Data
+API，全部 REST 调用带退避重试，因此本地历史与远端分叉也能推。注意 GitHub 会归一化
+author/committer 元数据，**远端提交 sha 与本地不同但树内容一致**——`git push` 之前先跑
+`python3 scripts/push_via_api.py --dry-run` 看差异即可。
+
 ## 状态（2026-09-27）：**新增「源码 + 驱动、不带 RT4 权重」的包** ✅
 
 `bash scripts/make_dist.sh --src-only` 生成 `dist/K100LC-RT4-src`（158MB）：
