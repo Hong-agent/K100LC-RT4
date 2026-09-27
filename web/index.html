@@ -2,30 +2,49 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="theme-color" content="#171a21">
 <title>K100 LC 对话</title>
 <style>
   :root { color-scheme: light dark; --bg:#0f1115; --panel:#171a21; --line:#2a2f3a;
-          --text:#e8eaf0; --muted:#9aa3b2; --user:#2b5cff; --assistant:#232833; }
-  * { box-sizing: border-box; }
-  body { margin:0; height:100vh; display:flex; flex-direction:column;
-         background:var(--bg); color:var(--text);
-         font:15px/1.6 system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; }
-  header { display:flex; flex-wrap:wrap; gap:10px; align-items:center;
-           padding:10px 14px; border-bottom:1px solid var(--line); background:var(--panel); }
-  header h1 { font-size:16px; margin:0 8px 0 0; font-weight:650; }
-  .dot { width:9px; height:9px; border-radius:50%; background:#666; display:inline-block; margin-right:6px; }
+          --text:#e8eaf0; --muted:#9aa3b2; --user:#2b5cff; --assistant:#232833;
+          --maxw:1040px; --chatw:920px; }
+  * { box-sizing:border-box; }
+  html, body { height:100%; }
+  body { margin:0; min-height:100vh; min-height:100dvh; display:flex; flex-direction:column;
+         overflow:hidden; background:var(--bg); color:var(--text);
+         font:15px/1.6 system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+         -webkit-tap-highlight-color:transparent; }
+  button, input, select, textarea { font:inherit; color:var(--text); background:#11141a;
+         border:1px solid var(--line); border-radius:10px; padding:8px 10px; outline:none; }
+  input:focus, select:focus, textarea:focus { border-color:#4d68d8;
+         box-shadow:0 0 0 3px rgba(77,104,216,.16); }
+  input[type=text] { width:170px; }
+  input[type=number] { width:92px; }
+  button { cursor:pointer; background:#222938; border-color:#333c4d;
+           -webkit-user-select:none; user-select:none; }
+  button:hover { background:#2a3345; }
+  button:active { transform:translateY(1px); }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  body > header { display:flex; flex-wrap:wrap; gap:10px 14px; align-items:center;
+           padding:10px 14px; padding-top:max(10px, env(safe-area-inset-top));
+           border-bottom:1px solid var(--line); background:rgba(23,26,33,.96);
+           backdrop-filter:blur(12px); }
+  .brand { display:flex; align-items:center; gap:10px; margin-right:auto; min-width:0; }
+  header h1 { font-size:16px; margin:0; font-weight:650; white-space:nowrap; }
+  .status { display:inline-flex; align-items:center; color:var(--muted); font-size:12px;
+            white-space:nowrap; }
+  .dot { width:9px; height:9px; border-radius:50%; background:#666; display:inline-block;
+         margin-right:6px; }
   .dot.ok { background:#35d07f; } .dot.bad { background:#ef5350; }
   label { color:var(--muted); font-size:13px; }
-  input, select, textarea, button { font:inherit; color:var(--text); background:#11141a;
-         border:1px solid var(--line); border-radius:9px; padding:7px 10px; outline:none; }
-  input[type=text] { width:170px; }
-  input[type=number] { width:78px; }
-  button { cursor:pointer; background:#222938; border-color:#333c4d; }
-  button:hover { background:#2a3345; }
-  button:disabled { opacity:.45; cursor:not-allowed; }
-  #log { flex:1; overflow:auto; padding:18px 14px 8px; }
-  .msg { display:flex; margin:0 auto 14px; max-width:920px; }
+  .controls { display:flex; flex:1 1 auto; flex-wrap:wrap; align-items:center;
+              gap:10px 14px; min-width:0; }
+  .controls label { display:flex; align-items:center; gap:6px; white-space:nowrap; }
+  .control-actions { display:flex; gap:8px; }
+  .settings-toggle { display:none; }
+  #log { flex:1 1 auto; min-height:0; overflow:auto; padding:18px 14px 8px; }
+  .msg { display:flex; margin:0 auto 14px; max-width:var(--chatw); }
   .msg.user { justify-content:flex-end; }
   .bubble { max-width:min(760px,86%); white-space:pre-wrap; word-break:break-word;
             padding:10px 13px; border-radius:14px; background:var(--assistant);
@@ -33,14 +52,19 @@
   .msg.user .bubble { background:var(--user); border-color:transparent; }
   .bubble.thinking::after { content:"▍"; animation:blink 1s steps(1) infinite; }
   @keyframes blink { 50% { opacity:0; } }
-  footer { border-top:1px solid var(--line); background:var(--panel); padding:10px 14px 14px; }
-  .stats { display:flex; flex-wrap:wrap; gap:14px; max-width:920px; margin:0 auto 8px;
-           color:var(--muted); font-size:12px; }
+  footer { border-top:1px solid var(--line); background:var(--panel);
+           padding:10px 14px 14px;
+           padding-bottom:calc(14px + env(safe-area-inset-bottom)); }
+  .stats { display:flex; flex-wrap:wrap; gap:12px 16px; max-width:var(--maxw);
+           margin:0 auto 8px; color:var(--muted); font-size:12px; }
   .stats b { color:var(--text); font-weight:600; }
-  .composer { display:flex; gap:10px; max-width:920px; margin:0 auto; align-items:flex-end; }
-  textarea { flex:1; resize:none; min-height:46px; max-height:180px; }
-  .hint { max-width:920px; margin:6px auto 0; color:var(--muted); font-size:12px; }
-  .attachbar { display:none; flex-wrap:wrap; gap:8px; max-width:920px; margin:0 auto 8px; }
+  .composer { display:grid; grid-template-columns:auto minmax(0,1fr) auto auto;
+              gap:10px; max-width:var(--maxw); margin:0 auto; align-items:end; }
+  textarea { width:100%; resize:none; min-height:46px; max-height:180px; line-height:1.5; }
+  #attach, #send, #stop { min-height:44px; white-space:nowrap; }
+  .hint { max-width:var(--maxw); margin:6px auto 0; color:var(--muted); font-size:12px; }
+  .attachbar { display:none; flex-wrap:wrap; gap:8px; max-width:var(--maxw);
+               margin:0 auto 8px; }
   .attachbar.show { display:flex; }
   .att { display:flex; align-items:center; gap:8px; max-width:260px; padding:6px 8px;
          border:1px solid var(--line); border-radius:11px; background:#11141a; font-size:12px; }
@@ -61,7 +85,7 @@
                          display:flex; align-items:center; justify-content:center;
                          border:2px dashed #6f8cff; border-radius:18px;
                          background:rgba(15,17,21,.82); color:var(--text); font-size:20px; z-index:20; }
-  .filebar { display:none; flex-wrap:wrap; gap:8px; max-width:920px; margin:0 auto 8px; }
+  .filebar { display:none; flex-wrap:wrap; gap:8px; max-width:var(--maxw); margin:0 auto 8px; }
   .filebar.show { display:flex; }
   .filecard { display:flex; align-items:center; gap:8px; padding:6px 8px; border:1px solid var(--line);
               border-radius:11px; background:#11141a; font-size:12px; }
@@ -79,33 +103,105 @@
   .preview { display:none; position:fixed; inset:0; z-index:30; background:rgba(0,0,0,.65);
              align-items:center; justify-content:center; padding:20px; }
   .preview.show { display:flex; }
-  .preview .box { width:min(1000px,96vw); height:min(800px,90vh); background:var(--panel);
-                  border:1px solid var(--line); border-radius:14px; display:flex; flex-direction:column; overflow:hidden; }
-  .preview header { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+  .preview .box { width:min(1000px,96vw); height:min(800px,90vh); height:min(800px,90dvh);
+                  background:var(--panel); border:1px solid var(--line); border-radius:14px;
+                  display:flex; flex-direction:column; overflow:hidden; }
+  .preview header { display:flex; justify-content:space-between; align-items:center; gap:10px;
+                    flex-wrap:wrap; }
   .preview .body { flex:1; overflow:auto; padding:14px; background:#0d0f13; }
   .preview .body pre { margin:0; white-space:pre-wrap; word-break:break-word; }
   .preview .body img { max-width:100%; max-height:100%; display:block; margin:auto; }
   .preview .body iframe { width:100%; height:100%; border:0; background:#fff; }
+
+  @media (max-width:760px) {
+    body > header { gap:8px; padding:8px 10px;
+                    padding-top:max(8px, env(safe-area-inset-top)); }
+    .brand { flex:1 1 auto; gap:8px; }
+    header h1 { font-size:15px; }
+    .status { font-size:11px; }
+    .settings-toggle { display:inline-flex; align-items:center; justify-content:center;
+                       min-height:38px; padding:6px 10px; font-size:13px; }
+    .controls { display:none; flex:1 1 100%; grid-template-columns:repeat(2,minmax(0,1fr));
+                gap:10px; margin-top:2px; padding-top:8px; border-top:1px solid var(--line); }
+    .controls.open { display:grid; max-height:52vh; max-height:min(52dvh,420px);
+                     overflow-y:auto; overscroll-behavior:contain; }
+    .controls label { flex-direction:column; align-items:stretch; gap:4px; white-space:normal; }
+    .controls label:first-child { grid-column:1 / -1; }
+    .controls input:not([type=checkbox]), .controls select { width:100%; min-height:42px;
+                                                            font-size:16px; }
+    .controls input[type=checkbox] { width:20px; height:20px; min-height:0; flex:0 0 auto;
+                                     accent-color:#4d68d8; }
+    .controls .skill-label { flex-direction:row; align-items:center; }
+    .control-actions { grid-column:1 / -1; display:flex; gap:8px; }
+    .control-actions button { flex:1; min-height:42px; }
+    #log { padding:12px 10px 4px; }
+    .msg { margin-bottom:12px; }
+    .bubble { max-width:94%; padding:10px 12px; border-radius:13px; }
+    .bubble .attachments img { max-width:100%; max-height:220px; }
+    .thinkline { max-height:110px; }
+    footer { padding:8px 10px 10px;
+             padding-bottom:calc(10px + env(safe-area-inset-bottom)); }
+    .stats { flex-wrap:nowrap; overflow-x:auto; gap:14px; margin-bottom:6px;
+             padding-bottom:2px; scrollbar-width:none; }
+    .stats::-webkit-scrollbar { display:none; }
+    .stats > span { flex:0 0 auto; }
+    .attachbar, .filebar { flex-wrap:nowrap; overflow-x:auto; padding-bottom:2px;
+                           scrollbar-width:none; }
+    .attachbar::-webkit-scrollbar, .filebar::-webkit-scrollbar { display:none; }
+    .att, .filecard { flex:0 0 auto; max-width:min(280px,84vw); }
+    .composer { grid-template-columns:minmax(0,1fr) auto auto;
+                grid-template-areas:"input input input" "attach send stop"; gap:8px; }
+    .composer textarea { grid-area:input; min-height:48px; max-height:132px; font-size:16px; }
+    #attach { grid-area:attach; justify-self:start; }
+    #send { grid-area:send; }
+    #stop { grid-area:stop; }
+    .hint { font-size:11px; line-height:1.45; max-height:3.1em; overflow:hidden; }
+    .hint-long { display:none; }
+    .preview { padding:0; }
+    .preview .box { width:100vw; height:100vh; height:100dvh; border:0; border-radius:0; }
+    .preview .body { padding:10px; }
+  }
+
+  @media (max-width:380px) {
+    .att .name, .filecard .fname { max-width:120px; }
+    .attach-label { display:none; }
+    #attach { padding-left:8px; padding-right:8px; }
+  }
+
+  @media (max-width:900px) and (max-height:520px) {
+    .hint { display:none; }
+    .stats { margin-bottom:4px; }
+    footer { padding-top:6px; padding-bottom:6px;
+             padding-bottom:calc(6px + env(safe-area-inset-bottom)); }
+  }
 </style>
 </head>
 <body>
 <header>
-  <h1>K100 LC 对话</h1>
-  <span><span id="statusDot" class="dot"></span><span id="statusText">连接中…</span></span>
-  <label>模型 <input id="model" type="text" value="qwen38-rt" placeholder="随便填"></label>
-  <label>思考
-    <select id="effort">
-      <option value="low" selected>low</option>
-      <option value="medium">medium</option>
-      <option value="xhigh">xhigh</option>
-      <option value="off">关闭</option>
-    </select>
-  </label>
-  <label>温度 <input id="temp" type="number" value="0" step="0.1" min="0" max="2"></label>
-  <label>最多 token <input id="maxTokens" type="number" value="128000" min="1" max="128000"></label>
-  <label><input id="skills" type="checkbox" checked> 技能</label>
-  <button id="clear">清空</button>
-  <button id="newSession">新会话</button>
+  <div class="brand">
+    <h1>K100 LC 对话</h1>
+    <span class="status"><span id="statusDot" class="dot"></span><span id="statusText">连接中…</span></span>
+  </div>
+  <button id="settingsToggle" class="settings-toggle" type="button"
+          aria-controls="controls" aria-expanded="false">设置</button>
+  <div id="controls" class="controls">
+    <label>模型 <input id="model" type="text" value="qwen38-rt" placeholder="随便填"></label>
+    <label>思考
+      <select id="effort">
+        <option value="low" selected>low</option>
+        <option value="medium">medium</option>
+        <option value="xhigh">xhigh</option>
+        <option value="off">关闭</option>
+      </select>
+    </label>
+    <label>温度 <input id="temp" type="number" value="0" step="0.1" min="0" max="2"></label>
+    <label>最多 token <input id="maxTokens" type="number" value="128000" min="1" max="128000"></label>
+    <label class="skill-label"><input id="skills" type="checkbox" checked> 技能</label>
+    <div class="control-actions">
+      <button id="clear">清空</button>
+      <button id="newSession">新会话</button>
+    </div>
+  </div>
 </header>
 
 <div id="log"></div>
@@ -123,13 +219,13 @@
   <div class="composer">
     <input id="files" type="file" multiple hidden
            accept="image/*,.txt,.md,.markdown,.json,.csv,.tsv,.log,.html,.htm,.xml,.yaml,.yml,.toml,.ini,.cfg,.conf,.py,.cpp,.cc,.c,.h,.hpp,.hip,.cu,.js,.ts,.sh,.bash,.sql,.rst,.tex,.srt,.pdf,.docx,.pptx,.xlsx,.rtf,.odt">
-    <button id="attach" type="button" title="上传文档或图片">＋ 文档/图片</button>
+    <button id="attach" type="button" title="上传文档或图片">＋ <span class="attach-label">文档/图片</span></button>
     <textarea id="input" rows="2" placeholder="输入消息，Enter 发送，Shift+Enter 换行"></textarea>
     <button id="send">发送</button>
     <button id="stop" disabled>停止</button>
   </div>
-  <div class="hint">模型名不校验，填什么都可以；流式输出。“最多 token”不是字数：
-    中文约 1 token ≈ 2 字，英文约 1 token ≈ 5~6 字符；思考内容也占 token。
+  <div class="hint"><span class="hint-long">模型名不校验，填什么都可以；流式输出。“最多 token”不是字数：
+    中文约 1 token ≈ 2 字，英文约 1 token ≈ 5~6 字符；思考内容也占 token。</span>
     <span id="capHint"></span></div>
 </footer>
 
@@ -175,6 +271,8 @@ const previewName = document.getElementById('previewName');
 const previewBody = document.getElementById('previewBody');
 const previewDownload = document.getElementById('previewDownload');
 const previewClose = document.getElementById('previewClose');
+const settingsToggle = document.getElementById('settingsToggle');
+const controlsEl = document.getElementById('controls');
 
 let messages = [];
 let controller = null;
@@ -411,6 +509,13 @@ function updateSendState() {
   sendBtn.disabled = !!controller || loading || (!inputEl.value.trim() && !usable);
 }
 
+function closeMobileControls() {
+  if (!window.matchMedia || !window.matchMedia('(max-width:760px)').matches) return;
+  controlsEl.classList.remove('open');
+  settingsToggle.textContent = '设置';
+  settingsToggle.setAttribute('aria-expanded', 'false');
+}
+
 function readDataUrl(file) {
   return new Promise((resolve, reject) => {
     const r = new FileReader();
@@ -506,6 +611,7 @@ async function send() {
   const usable = typed || attachments.some(a => (a.kind === 'image' && a.dataUrl) ||
                                               a.status === 'ok');
   if (!ready || !usable) return;
+  closeMobileControls();
   const text = composeText();
   const userAtts = attachments.slice();
   inputEl.value = '';
@@ -695,6 +801,11 @@ newSessionBtn.onclick = () => {
   inputEl.focus();
 };
 attachBtn.onclick = () => filesEl.click();
+settingsToggle.onclick = () => {
+  const open = controlsEl.classList.toggle('open');
+  settingsToggle.textContent = open ? '收起' : '设置';
+  settingsToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+};
 filesEl.onchange = async () => {
   await handleFiles([...filesEl.files]);
   filesEl.value = '';
