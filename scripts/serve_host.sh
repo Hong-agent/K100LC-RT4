@@ -1,7 +1,7 @@
 #!/bin/bash
 # 主机直跑的 OpenAI 兼容服务（对应容器版 scripts/serve.sh）。
 #
-#   bash scripts/serve_host.sh
+#   bash scripts/serve_host.sh               # 默认 80 端口，局域网只输 IP 即可
 #   PORT=18080 CTX=4096 MTP_N=0 bash scripts/serve_host.sh
 #   bash scripts/serve_host.sh --stop
 #
@@ -13,7 +13,7 @@ cd "$RT_ROOT"
 NAME=rt-serve-host
 PIDFILE="$RT_HOST_RUNTIME/$NAME.pid"
 LOGFILE="$RT_HOST_RUNTIME/$NAME.log"
-PORT="${PORT:-8080}"
+PORT="${PORT:-80}"
 CTX="${CTX:-131072}"
 DEFAULT_MAX_TOKENS="${RT_DEFAULT_MAX_TOKENS:-128000}"
 MTP_N="${MTP_N:-${RT_MTP_N:-3}}"
@@ -43,6 +43,23 @@ if [ "${1:-}" = "--stop" ]; then
   fi
   exit 0
 fi
+
+ensure_port_bindable() {
+  [ "$PORT" -ge 1024 ] && return 0
+  local current
+  current="$(sysctl -n net.ipv4.ip_unprivileged_port_start 2>/dev/null || echo 1024)"
+  [ "$current" -le "$PORT" ] && return 0
+
+  echo "[serve_host] 允许非 root 绑定端口 $PORT（net.ipv4.ip_unprivileged_port_start=$PORT）"
+  if [ "$(id -u)" = 0 ]; then
+    sysctl -w "net.ipv4.ip_unprivileged_port_start=$PORT" >/dev/null
+  elif [ -n "${SUDO_ASKPASS:-}" ]; then
+    sudo -A sysctl -w "net.ipv4.ip_unprivileged_port_start=$PORT" >/dev/null
+  else
+    sudo sysctl -w "net.ipv4.ip_unprivileged_port_start=$PORT" >/dev/null
+  fi
+}
+ensure_port_bindable
 
 if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
   echo "$NAME 已在运行，PID $(cat "$PIDFILE")（日志 $LOGFILE）" >&2
@@ -79,8 +96,9 @@ for _ in $(seq 1 240); do
 done
 
 LAN_IP="$(ip -4 -o addr show scope global 2>/dev/null | awk '{print $4}' | cut -d/ -f1 | grep -v '^172\.17\.' | head -1)"
+if [ "$PORT" = "80" ]; then HTTP_PORT=""; else HTTP_PORT=":$PORT"; fi
 echo "$NAME 已启动（PID $PID，加载权重约 20 秒）"
-echo "  网页 : http://${LAN_IP:-<本机IP>}:$PORT/"
-echo "  接口 : http://${LAN_IP:-<本机IP>}:$PORT/v1"
+echo "  网页 : http://${LAN_IP:-<本机IP>}${HTTP_PORT}/"
+echo "  接口 : http://${LAN_IP:-<本机IP>}${HTTP_PORT}/v1"
 echo "  日志 : tail -f $LOGFILE"
 echo "  停止 : bash scripts/serve_host.sh --stop"

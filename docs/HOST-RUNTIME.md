@@ -33,11 +33,12 @@ cd K100LC-RT4
 bash scripts/make_host_runtime.sh        # 从本地 DTK 镜像抽取到 runtime/，一次性
 
 bash scripts/chat_host.sh --prompt "你好" --n 32 --temp 0
-bash scripts/serve_host.sh               # 主机直跑 HTTP 服务 :8080
+bash scripts/serve_host.sh               # 默认监听 80，局域网只输 IP 即可
 bash scripts/host_dsh.sh 'python3 scripts/bench_rt.py'
 ```
 
-如果容器版服务已经占了 8080，用 `PORT=18080 bash scripts/serve_host.sh`。
+网页和接口默认显示为 `http://<本机IP>/`、`http://<本机IP>/v1`。如果 80 端口被别的
+程序占用，可以用 `PORT=8080 bash scripts/serve_host.sh` 改到 8080。
 
 服务停止：
 

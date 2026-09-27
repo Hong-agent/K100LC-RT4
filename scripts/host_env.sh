@@ -11,6 +11,11 @@
 
 export RT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/.." && pwd)"
 
+# 本机有项目自带的 sudo askpass 时，主机脚本也能非交互地设置低端口权限。
+if [ -z "${SUDO_ASKPASS:-}" ] && [ -x "$RT_ROOT/.askpass.sh" ]; then
+  export SUDO_ASKPASS="$RT_ROOT/.askpass.sh"
+fi
+
 # 主机直跑运行库目录（默认 gitignore，不随源码入库）
 export RT_HOST_RUNTIME="${RT_HOST_RUNTIME:-$RT_ROOT/runtime}"
 export RT_HOST_LIBS="${RT_HOST_LIBS:-$RT_HOST_RUNTIME/dtk-libs}"
