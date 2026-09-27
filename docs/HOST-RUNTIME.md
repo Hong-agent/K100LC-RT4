@@ -35,13 +35,13 @@ bash scripts/make_host_runtime.sh --check
 ```
 
 Release：
-<https://github.com/Hong-agent/K100LC-RT4/releases/tag/host-runtime-2026-09-27>
+<https://github.com/Hong-agent/K100LC-RT4/releases/tag/host-runtime-2026-09-27-r2>
 
-压缩包 `K100LC-RT4-host-runtime-2026-09-27.tar.zst` 约 53MB：
+压缩包 `K100LC-RT4-host-runtime-2026-09-27-r2.tar.zst` 约 53MB：
 
 ```text
 内容：build/rt + runtime/dtk-libs + runtime/py
-sha256 d81fcafc083ec38f3fafafa7adcce861ba6fd0369dcfab131899c5b0a5e3dd7c
+sha256 618a750de04fabfdb360f2a3c6560495508c02c27387f4a3a6e69ba587505824
 ```
 
 `fetch_host_runtime.sh` 会下载压缩包和 `.sha256`、校验后解压出 `build/rt` 和

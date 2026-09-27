@@ -7,7 +7,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 REPO="${REPO:-Hong-agent/K100LC-RT4}"
-TAG="${TAG:-host-runtime-2026-09-27}"
+TAG="${TAG:-host-runtime-2026-09-27-r2}"
 ASSET="${ASSET:-K100LC-RT4-${TAG}.tar.zst}"
 OUT_DIR="${OUT_DIR:-$ROOT/dist}"
 ARCHIVE="$OUT_DIR/$ASSET"
