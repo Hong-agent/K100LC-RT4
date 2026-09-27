@@ -1,5 +1,29 @@
 # 接续说明（自研运行时线）
 
+## 状态（2026-09-27）：**离线包带上 DCU 驱动** ✅
+
+`scripts/make_dist.sh` 现在除了 `app/`（源码 + `build/rt` + 15GB 权重）和可选的
+`image/`，还会生成 **`driver/`**，目标机器上「驱动 + 这个目录」就能不联网跑起来：
+
+* `driver/installer/`：**修正版**安装包 `rock-5.7.1-6.2.35-V1.6.7-内核68修正.aio.run`
+  （67MB，MD5 记录在 `MD5SUMS.txt`）+《内核68修正-说明.md》——原厂包在 Ubuntu 22.04 /
+  内核 6.8 上会因 `enum drm_debug_category` 探测误判而编译失败。
+* `driver/hyhal/hyhal-prebuilt-<内核>.tar.gz`：本机装好的 `/usr/local/hyhal`（89MB 压缩，
+  解压 322MB）：`bin/hy-smi`、`bin/hymgr`、`lib/*.so`、`hsa/`、`vbios/` 固件，以及
+  `dkms/*.ko`（本机编译好的 7 个模块）。容器要 `-v /opt/hyhal:/opt/hyhal:ro`，必须有它。
+* `driver/system/`：`16-dcu.rules` / `hydcu.conf` / `blacklist-hydcu.conf` / `hymgr.service`。
+* `driver/manifest.txt`：内核、包版本、lsmod、hy-smi、GRUB 默认项、已装内核列表等现场快照。
+* `driver/INSTALL.md`：安装顺序 + 三个坑（**必须用修正包**；驱动只对安装时运行的内核
+  编译，装完要把 GRUB 默认项锁回 `6.8.0-40-generic`；升级内核要重装驱动）。
+
+包根目录还补齐了本来只被注释提到的入口：`start.sh`（起服务，参数透传）、`status.sh`
+（驱动/设备/权重/镜像自检，`--full` 加权重 sha256）、`README-OFFLINE.md`（新机器操作顺序
+与常见问题）。实测：`bash status.sh` 全绿；`bash start.sh` 从**包里**（而不是仓库）起服务，
+`/v1/capabilities` 正常（context 131072 / max_tokens 128000 / local 视觉塔），能正常对话。
+
+顺带修了 `status.sh` 第一版的坑：`xxx | grep -q` 配上 `set -o pipefail` 时，`grep -q`
+提前退出会把上游弄成 SIGPIPE(141)，导致「hydcu 已加载」被误判成未加载——改用 awk 判定。
+
 ## 状态（2026-09-27）：**网页继续修：max_tokens 不再 413、停止按钮真能停** ✅
 
 用户反馈「输入 10854 token + 最多生成 128000 token 超过上下文 131072」。根因是我上一轮

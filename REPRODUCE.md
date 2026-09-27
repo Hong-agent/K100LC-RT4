@@ -49,7 +49,7 @@ OpenAI 兼容服务层全部自研。设计取舍与实测数据都写在 `docs/
 | 转换产物 RT4（主模型 + MTP） | 14.14GB |
 | 视觉塔 RT4（独立文件） | 0.93GB |
 | **合计** | **≈74GB**（另外每个 `build/rt` 只 0.4MB） |
-| 可选：离线包 `dist/` / 镜像 tar | +14GB / +35GB |
+| 可选：离线包 `dist/`（应用+权重+驱动）/ 镜像 tar | +15.5GB / +35GB |
 
 ### 软件
 
@@ -86,6 +86,11 @@ docker pull harbor.sourcefind.cn:5443/dcu/admin/base/custom:vllm0.18.1-ubuntu22.
 ```
 
 离线：拿到 `rt-dtk26.04-qwen3.8.tar` 后 `docker load -i rt-dtk26.04-qwen3.8.tar`。
+
+驱动：`bash scripts/make_dist.sh` 会把 DCU 驱动一起打进 `dist/K100LC-RT4-offline/driver/`
+（修正版安装包 + 预编译 `/usr/local/hyhal` + udev/modprobe/服务 + 现场快照 `manifest.txt`），
+安装步骤与三个坑见包内 `driver/INSTALL.md`：必须用「内核68修正」包、装完把 GRUB 默认项
+锁回编译时的内核、以后升级内核要重装。
 
 自检（会自动挂载项目到 `/rt`、source DTK 环境）：
 

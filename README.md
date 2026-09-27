@@ -81,7 +81,10 @@ K100LC-RT4/
 │   ├── dec_bench.py       解码墙钟基准（各条优化的 A/B 用）
 │   ├── dec_bench_ctx.py   解码速率 vs 上下文长度
 │   ├── attn_decode_check.py  解码注意力的独立复核（内核 vs fp64）
-│   ├── make_dist.sh       ★ 生成 dist/K100LC-RT4-offline 离线包（见该目录 README-OFFLINE.md）
+│   ├── make_dist.sh       ★ 生成 dist/K100LC-RT4-offline 离线包：应用 + 权重 +
+│   │                        **DCU 驱动**（安装包/预编译 hyhal/udev/服务/现场快照），
+│   │                        见包内 README-OFFLINE.md 与 driver/INSTALL.md
+│   ├── publish_github.sh  一键发布到 GitHub（用一次性 PAT，不落盘）
 │   └── run_fa.sh          int4 FlashAttention 正确性与吞吐
 │   └── run_fa_rows.sh     验证批解码注意力自检（逐行 vs 一次算完，逐位比较）
 └── models/Qwen3.8-27B-NVFP4/
