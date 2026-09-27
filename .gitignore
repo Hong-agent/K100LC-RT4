@@ -1,0 +1,29 @@
+# ---- 权重与模型文件：第三方内容，不入库（用 scripts/convert_weights.sh 下载） ----
+models/
+*.safetensors
+*.rt4
+*.gguf
+
+# ---- 编译产物 / 调试 dump ----
+build/
+*.o
+*.bin
+
+# ---- 离线部署包（14GB+，由 scripts/make_dist.sh 生成） ----
+dist/
+
+# ---- 网页技能生成的会话文件 ----
+workspaces/
+
+# ---- 本机 sudo 密码助手（明文口令，绝不入库） ----
+.askpass.sh
+
+# ---- Python ----
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# ---- 编辑器 / 系统 ----
+.vscode/
+.idea/
+.DS_Store

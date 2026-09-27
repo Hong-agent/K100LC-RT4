@@ -1,0 +1,734 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>K100 LC 对话</title>
+<style>
+  :root { color-scheme: light dark; --bg:#0f1115; --panel:#171a21; --line:#2a2f3a;
+          --text:#e8eaf0; --muted:#9aa3b2; --user:#2b5cff; --assistant:#232833; }
+  * { box-sizing: border-box; }
+  body { margin:0; height:100vh; display:flex; flex-direction:column;
+         background:var(--bg); color:var(--text);
+         font:15px/1.6 system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; }
+  header { display:flex; flex-wrap:wrap; gap:10px; align-items:center;
+           padding:10px 14px; border-bottom:1px solid var(--line); background:var(--panel); }
+  header h1 { font-size:16px; margin:0 8px 0 0; font-weight:650; }
+  .dot { width:9px; height:9px; border-radius:50%; background:#666; display:inline-block; margin-right:6px; }
+  .dot.ok { background:#35d07f; } .dot.bad { background:#ef5350; }
+  label { color:var(--muted); font-size:13px; }
+  input, select, textarea, button { font:inherit; color:var(--text); background:#11141a;
+         border:1px solid var(--line); border-radius:9px; padding:7px 10px; outline:none; }
+  input[type=text] { width:170px; }
+  input[type=number] { width:78px; }
+  button { cursor:pointer; background:#222938; border-color:#333c4d; }
+  button:hover { background:#2a3345; }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  #log { flex:1; overflow:auto; padding:18px 14px 8px; }
+  .msg { display:flex; margin:0 auto 14px; max-width:920px; }
+  .msg.user { justify-content:flex-end; }
+  .bubble { max-width:min(760px,86%); white-space:pre-wrap; word-break:break-word;
+            padding:10px 13px; border-radius:14px; background:var(--assistant);
+            border:1px solid var(--line); }
+  .msg.user .bubble { background:var(--user); border-color:transparent; }
+  .bubble.thinking::after { content:"▍"; animation:blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity:0; } }
+  footer { border-top:1px solid var(--line); background:var(--panel); padding:10px 14px 14px; }
+  .stats { display:flex; flex-wrap:wrap; gap:14px; max-width:920px; margin:0 auto 8px;
+           color:var(--muted); font-size:12px; }
+  .stats b { color:var(--text); font-weight:600; }
+  .composer { display:flex; gap:10px; max-width:920px; margin:0 auto; align-items:flex-end; }
+  textarea { flex:1; resize:none; min-height:46px; max-height:180px; }
+  .hint { max-width:920px; margin:6px auto 0; color:var(--muted); font-size:12px; }
+  .attachbar { display:none; flex-wrap:wrap; gap:8px; max-width:920px; margin:0 auto 8px; }
+  .attachbar.show { display:flex; }
+  .att { display:flex; align-items:center; gap:8px; max-width:260px; padding:6px 8px;
+         border:1px solid var(--line); border-radius:11px; background:#11141a; font-size:12px; }
+  .att.error { border-color:#8f3a3a; }
+  .att img { width:44px; height:44px; object-fit:cover; border-radius:7px; display:block; }
+  .att .meta { min-width:0; }
+  .att .name { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+               color:var(--text); max-width:150px; }
+  .att .sub { color:var(--muted); font-size:11px; }
+  .att .x { border:0; background:transparent; color:var(--muted); padding:2px 4px; font-size:16px; }
+  .att .x:hover { color:var(--text); background:transparent; }
+  .bubble .attachments { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+  .bubble .attachments img { max-width:min(360px,100%); max-height:260px; border-radius:10px;
+                             display:block; border:1px solid rgba(255,255,255,.18); }
+  .bubble .doc { padding:6px 8px; border:1px solid rgba(255,255,255,.22);
+                 border-radius:9px; background:rgba(0,0,0,.14); font-size:12px; }
+  body.dragging::after { content:"松开即可添加图片或文档"; position:fixed; inset:12px;
+                         display:flex; align-items:center; justify-content:center;
+                         border:2px dashed #6f8cff; border-radius:18px;
+                         background:rgba(15,17,21,.82); color:var(--text); font-size:20px; z-index:20; }
+  .filebar { display:none; flex-wrap:wrap; gap:8px; max-width:920px; margin:0 auto 8px; }
+  .filebar.show { display:flex; }
+  .filecard { display:flex; align-items:center; gap:8px; padding:6px 8px; border:1px solid var(--line);
+              border-radius:11px; background:#11141a; font-size:12px; }
+  .filecard .fname { max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .filecard .fsub { color:var(--muted); font-size:11px; }
+  .filecard button { padding:3px 7px; font-size:11px; border-radius:7px; }
+  .skills { display:none; margin-bottom:6px; }
+  .skills.show { display:block; }
+  .skillline { font-size:12px; color:var(--muted); padding:2px 0; }
+  .skillline b { color:#8fb0ff; font-weight:600; }
+  .thinkline { font-size:12px; color:#8a8f98; white-space:pre-wrap; padding:2px 0 6px;
+               max-height:150px; overflow:auto; border-left:2px solid #3a3f4b;
+               padding-left:8px; margin-left:2px; }
+  .thinkline:empty { display:none; }
+  .preview { display:none; position:fixed; inset:0; z-index:30; background:rgba(0,0,0,.65);
+             align-items:center; justify-content:center; padding:20px; }
+  .preview.show { display:flex; }
+  .preview .box { width:min(1000px,96vw); height:min(800px,90vh); background:var(--panel);
+                  border:1px solid var(--line); border-radius:14px; display:flex; flex-direction:column; overflow:hidden; }
+  .preview header { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+  .preview .body { flex:1; overflow:auto; padding:14px; background:#0d0f13; }
+  .preview .body pre { margin:0; white-space:pre-wrap; word-break:break-word; }
+  .preview .body img { max-width:100%; max-height:100%; display:block; margin:auto; }
+  .preview .body iframe { width:100%; height:100%; border:0; background:#fff; }
+</style>
+</head>
+<body>
+<header>
+  <h1>K100 LC 对话</h1>
+  <span><span id="statusDot" class="dot"></span><span id="statusText">连接中…</span></span>
+  <label>模型 <input id="model" type="text" value="qwen38-rt" placeholder="随便填"></label>
+  <label>思考
+    <select id="effort">
+      <option value="low" selected>low</option>
+      <option value="medium">medium</option>
+      <option value="xhigh">xhigh</option>
+      <option value="off">关闭</option>
+    </select>
+  </label>
+  <label>温度 <input id="temp" type="number" value="0" step="0.1" min="0" max="2"></label>
+  <label>最多 token <input id="maxTokens" type="number" value="128000" min="1" max="128000"></label>
+  <label><input id="skills" type="checkbox" checked> 技能</label>
+  <button id="clear">清空</button>
+  <button id="newSession">新会话</button>
+</header>
+
+<div id="log"></div>
+
+<footer>
+  <div class="stats">
+    <span>预填充 <b id="sPrefill">—</b></span>
+    <span>生成 <b id="sGen">—</b></span>
+    <span>实时 <b id="sLive">—</b></span>
+    <span>首 token <b id="sTtft">—</b></span>
+    <span>本轮 <b id="sTokens">0 tok</b></span>
+  </div>
+  <div id="fileBar" class="filebar"></div>
+  <div id="attachBar" class="attachbar"></div>
+  <div class="composer">
+    <input id="files" type="file" multiple hidden
+           accept="image/*,.txt,.md,.markdown,.json,.csv,.tsv,.log,.html,.htm,.xml,.yaml,.yml,.toml,.ini,.cfg,.conf,.py,.cpp,.cc,.c,.h,.hpp,.hip,.cu,.js,.ts,.sh,.bash,.sql,.rst,.tex,.srt,.pdf,.docx,.pptx,.xlsx,.rtf,.odt">
+    <button id="attach" type="button" title="上传文档或图片">＋ 文档/图片</button>
+    <textarea id="input" rows="2" placeholder="输入消息，Enter 发送，Shift+Enter 换行"></textarea>
+    <button id="send">发送</button>
+    <button id="stop" disabled>停止</button>
+  </div>
+  <div class="hint">模型名不校验，填什么都可以；流式输出。“最多 token”不是字数：
+    中文约 1 token ≈ 2 字，英文约 1 token ≈ 5~6 字符；思考内容也占 token。
+    <span id="capHint"></span></div>
+</footer>
+
+<div id="preview" class="preview">
+  <div class="box">
+    <header style="padding:10px 14px;border-bottom:1px solid var(--line);background:var(--panel)">
+      <b id="previewName">文件预览</b>
+      <span>
+        <a id="previewDownload" href="#" download><button type="button">下载</button></a>
+        <button id="previewClose" type="button">关闭</button>
+      </span>
+    </header>
+    <div id="previewBody" class="body"></div>
+  </div>
+</div>
+
+<script>
+const logEl = document.getElementById('log');
+const inputEl = document.getElementById('input');
+const sendBtn = document.getElementById('send');
+const stopBtn = document.getElementById('stop');
+const clearBtn = document.getElementById('clear');
+const modelEl = document.getElementById('model');
+const effortEl = document.getElementById('effort');
+const tempEl = document.getElementById('temp');
+const maxEl = document.getElementById('maxTokens');
+const dotEl = document.getElementById('statusDot');
+const statusEl = document.getElementById('statusText');
+const sPrefill = document.getElementById('sPrefill');
+const sGen = document.getElementById('sGen');
+const sLive = document.getElementById('sLive');
+const sTtft = document.getElementById('sTtft');
+const sTokens = document.getElementById('sTokens');
+const filesEl = document.getElementById('files');
+const attachBtn = document.getElementById('attach');
+const attachBar = document.getElementById('attachBar');
+const capHint = document.getElementById('capHint');
+const skillsEl = document.getElementById('skills');
+const fileBar = document.getElementById('fileBar');
+const newSessionBtn = document.getElementById('newSession');
+const previewEl = document.getElementById('preview');
+const previewName = document.getElementById('previewName');
+const previewBody = document.getElementById('previewBody');
+const previewDownload = document.getElementById('previewDownload');
+const previewClose = document.getElementById('previewClose');
+
+let messages = [];
+let controller = null;
+let attachments = [];
+let caps = { vision:false, max_upload_mb:25 };
+let conversationId = localStorage.getItem('rt_conversation') || '';
+if (!conversationId) {
+  conversationId = (crypto.randomUUID && crypto.randomUUID()) ||
+                   ('conv-' + Date.now() + '-' + Math.random().toString(16).slice(2));
+  localStorage.setItem('rt_conversation', conversationId);
+}
+
+function addMessage(role, text, atts = []) {
+  const row = document.createElement('div');
+  row.className = 'msg ' + role;
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  const skillsEl = document.createElement('div');
+  skillsEl.className = 'skills';
+  bubble.appendChild(skillsEl);
+  const textEl = document.createElement('div');
+  textEl.className = 'bubble-text';
+  textEl.textContent = text || '';
+  bubble.appendChild(textEl);
+  if (atts.length) {
+    const box = document.createElement('div');
+    box.className = 'attachments';
+    for (const a of atts) {
+      if (a.kind === 'image' && a.dataUrl) {
+        const img = document.createElement('img');
+        img.src = a.dataUrl;
+        img.alt = a.name || '图片';
+        img.title = a.name + (caps.vision ? '' : '（当前模型未启用视觉，仅展示）');
+        box.appendChild(img);
+      } else {
+        const doc = document.createElement('div');
+        doc.className = 'doc';
+        doc.textContent = '📄 ' + (a.name || '文档') + ' · ' + (a.chars || 0) + ' 字' +
+                          (a.truncated ? '（已截断）' : '');
+        doc.title = (a.text || '').slice(0, 500);
+        box.appendChild(doc);
+      }
+    }
+    bubble.appendChild(box);
+  }
+  row.appendChild(bubble);
+  logEl.appendChild(row);
+  logEl.scrollTop = logEl.scrollHeight;
+  return { row, bubble, textEl, skillsEl };
+}
+
+function setStatus(ok, text) {
+  dotEl.className = 'dot ' + (ok ? 'ok' : 'bad');
+  statusEl.textContent = text;
+}
+
+async function health() {
+  try {
+    const r = await fetch('/health');
+    const j = await r.json();
+    setStatus(true, '就绪 · ' + (j.model || ''));
+  } catch (e) {
+    setStatus(false, '未连接');
+  }
+}
+
+async function loadCaps() {
+  try {
+    const r = await fetch('/v1/capabilities');
+    if (r.ok) caps = await r.json();
+  } catch (e) { /* 旧服务没有这个接口时按纯文本模式处理 */ }
+  capHint.textContent = caps.vision
+    ? ' 图片会先交给视觉模型识别，再连同文字一起送入 RT4。文档会提取为文本。'
+    : ' 支持上传图片和文档；文档会提取为文本。当前 RT4 运行时未启用视觉，图片可在会话中展示但不会送入模型。';
+  updateSendState();
+  renderAttachments();
+}
+
+health();
+loadCaps();
+setInterval(health, 15000);
+
+function fmtSize(n) {
+  if (n >= 1024 * 1024) return (n / 1024 / 1024).toFixed(1) + ' MB';
+  if (n >= 1024) return (n / 1024).toFixed(0) + ' KB';
+  return n + ' B';
+}
+
+function fileURL(name, download) {
+  return '/v1/files/' + encodeURIComponent(name) +
+         '?conversation_id=' + encodeURIComponent(conversationId) +
+         (download ? '&download=1' : '');
+}
+
+async function refreshFiles() {
+  try {
+    const r = await fetch('/v1/files?conversation_id=' +
+                           encodeURIComponent(conversationId));
+    if (!r.ok) return;
+    const j = await r.json();
+    renderFileBar(j.files || []);
+  } catch (e) { /* 旧服务没有文件接口 */ }
+}
+
+function renderFileBar(files) {
+  fileBar.innerHTML = '';
+  for (const f of files) {
+    const card = document.createElement('div');
+    card.className = 'filecard';
+    const name = document.createElement('span');
+    name.className = 'fname';
+    name.textContent = '📄 ' + f.name;
+    name.title = f.name;
+    const sub = document.createElement('span');
+    sub.className = 'fsub';
+    sub.textContent = fmtSize(f.size);
+    const open = document.createElement('button');
+    open.type = 'button';
+    open.textContent = '打开';
+    open.onclick = () => openPreview(f);
+    const dl = document.createElement('a');
+    dl.href = fileURL(f.name, true);
+    dl.download = f.name;
+    const dlBtn = document.createElement('button');
+    dlBtn.type = 'button';
+    dlBtn.textContent = '下载';
+    dl.appendChild(dlBtn);
+    card.append(name, sub, open, dl);
+    fileBar.appendChild(card);
+  }
+  fileBar.classList.toggle('show', files.length > 0);
+}
+
+async function openPreview(f) {
+  previewEl.classList.add('show');
+  previewName.textContent = f.name;
+  previewDownload.href = fileURL(f.name, true);
+  previewDownload.download = f.name;
+  previewBody.innerHTML = '';
+  const ext = (f.ext || '').toLowerCase();
+  if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'avif'].includes(ext)) {
+    const img = document.createElement('img');
+    img.src = fileURL(f.name, false);
+    previewBody.appendChild(img);
+    return;
+  }
+  if (ext === 'pdf' || ext === 'html' || ext === 'htm') {
+    const frame = document.createElement('iframe');
+    frame.setAttribute('sandbox', 'allow-same-origin');
+    frame.src = fileURL(f.name, false);
+    previewBody.appendChild(frame);
+    return;
+  }
+  const pre = document.createElement('pre');
+  try {
+    const r = await fetch(fileURL(f.name, false));
+    pre.textContent = (await r.text()).slice(0, 200000);
+  } catch (e) {
+    pre.textContent = '读取失败：' + e.message;
+  }
+  previewBody.appendChild(pre);
+}
+
+previewClose.onclick = () => previewEl.classList.remove('show');
+previewEl.addEventListener('click', (e) => {
+  if (e.target === previewEl) previewEl.classList.remove('show');
+});
+
+function uid() {
+  return (crypto.randomUUID && crypto.randomUUID()) ||
+         (Date.now() + '-' + Math.random().toString(16).slice(2));
+}
+
+function humanSize(n) {
+  if (n >= 1024 * 1024) return (n / 1024 / 1024).toFixed(1) + ' MB';
+  if (n >= 1024) return (n / 1024).toFixed(0) + ' KB';
+  return n + ' B';
+}
+
+function renderAttachments() {
+  attachBar.innerHTML = '';
+  for (const a of attachments) {
+    const chip = document.createElement('div');
+    chip.className = 'att' + (a.error ? ' error' : '');
+    if (a.kind === 'image' && a.dataUrl) {
+      const img = document.createElement('img');
+      img.src = a.dataUrl;
+      img.alt = a.name;
+      chip.appendChild(img);
+    } else {
+      const icon = document.createElement('span');
+      icon.textContent = '📄';
+      chip.appendChild(icon);
+    }
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    const name = document.createElement('span');
+    name.className = 'name';
+    name.textContent = a.name;
+    name.title = a.name;
+    const sub = document.createElement('span');
+    sub.className = 'sub';
+    if (a.error) {
+      sub.textContent = a.error;
+    } else if (a.kind === 'image') {
+      sub.textContent = humanSize(a.size) + (caps.vision ? ' · 视觉' : ' · 仅展示');
+    } else if (a.status === 'loading') {
+      sub.textContent = '解析中…';
+    } else {
+      sub.textContent = (a.chars || 0) + ' 字' + (a.truncated ? ' · 已截断' : '');
+    }
+    meta.appendChild(name);
+    meta.appendChild(sub);
+    chip.appendChild(meta);
+    const x = document.createElement('button');
+    x.className = 'x';
+    x.type = 'button';
+    x.textContent = '×';
+    x.title = '移除';
+    x.onclick = () => {
+      attachments = attachments.filter(item => item.id !== a.id);
+      renderAttachments();
+    };
+    chip.appendChild(x);
+    attachBar.appendChild(chip);
+  }
+  attachBar.classList.toggle('show', attachments.length > 0);
+  updateSendState();
+}
+
+function updateSendState() {
+  const usable = attachments.some(a => (a.kind === 'image' && a.dataUrl) || a.status === 'ok');
+  const loading = attachments.some(a => a.kind === 'document' && a.status === 'loading');
+  sendBtn.disabled = !!controller || loading || (!inputEl.value.trim() && !usable);
+}
+
+function readDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = () => reject(r.error || new Error('读取失败'));
+    r.readAsDataURL(file);
+  });
+}
+
+async function extractFile(file, att) {
+  try {
+    const r = await fetch('/v1/extract?name=' + encodeURIComponent(file.name), {
+      method: 'POST',
+      headers: { 'Content-Type': file.type || 'application/octet-stream' },
+      body: file,
+    });
+    if (!r.ok) throw new Error((await r.text()).slice(0, 200) || ('HTTP ' + r.status));
+    const j = await r.json();
+    att.status = 'ok';
+    att.text = j.text || '';
+    att.chars = j.chars || 0;
+    att.truncated = !!j.truncated;
+    att.warning = j.warning || '';
+  } catch (e) {
+    att.status = 'error';
+    att.error = e.message || '解析失败';
+  }
+  renderAttachments();
+}
+
+async function handleFiles(list) {
+  const maxBytes = (caps.max_upload_mb || 25) * 1024 * 1024;
+  for (const file of list) {
+    const id = uid();
+    const isImage = (file.type || '').startsWith('image/') ||
+                    /\.(png|jpe?g|gif|webp|bmp|svg|avif)$/i.test(file.name || '');
+    if (file.size > maxBytes) {
+      attachments.push({ id, name:file.name, size:file.size, kind:isImage ? 'image' : 'document',
+                         error:'超过 ' + (caps.max_upload_mb || 25) + 'MB 上限' });
+      continue;
+    }
+    if (isImage) {
+      if (file.size > 10 * 1024 * 1024) {
+        attachments.push({ id, name:file.name, size:file.size, kind:'image',
+                           error:'图片超过 10MB' });
+        continue;
+      }
+      try {
+        const dataUrl = await readDataUrl(file);
+        attachments.push({ id, name:file.name, size:file.size, kind:'image', dataUrl });
+      } catch (e) {
+        attachments.push({ id, name:file.name, size:file.size, kind:'image',
+                           error:'读取失败' });
+      }
+    } else {
+      const att = { id, name:file.name, size:file.size, kind:'document', status:'loading' };
+      attachments.push(att);
+      renderAttachments();
+      await extractFile(file, att);
+    }
+  }
+  renderAttachments();
+}
+
+function composeText() {
+  const typed = inputEl.value.trim();
+  const parts = [];
+  for (const a of attachments) {
+    if (a.kind === 'document' && a.status === 'ok' && a.text) {
+      const safeName = a.name.replace(/"/g, "'");
+      parts.push('<document name="' + safeName + '">\n' + a.text + '\n</document>');
+    }
+  }
+  if (typed) parts.push(typed);
+  if (!typed && attachments.some(a => a.kind === 'image')) parts.push('请查看上传的图片。');
+  return parts.join('\n\n');
+}
+
+function buildUserContent(text) {
+  const images = attachments.filter(a => a.kind === 'image' && a.dataUrl);
+  if (!images.length) return text;
+  const content = [{ type:'text', text: text || '请查看上传的图片。' }];
+  for (const a of images) {
+    content.push({ type:'image_url', name:a.name, image_url:{ url:a.dataUrl } });
+  }
+  return content;
+}
+
+async function send() {
+  if (controller) return;
+  const typed = inputEl.value.trim();
+  const ready = attachments.every(a => (a.kind === 'image' && a.dataUrl) || a.status === 'ok');
+  const usable = typed || attachments.some(a => (a.kind === 'image' && a.dataUrl) ||
+                                              a.status === 'ok');
+  if (!ready || !usable) return;
+  const text = composeText();
+  const userAtts = attachments.slice();
+  inputEl.value = '';
+  attachments = [];
+  renderAttachments();
+  addMessage('user', typed || (userAtts.some(a => a.kind === 'image') ? '（图片）' : '（文档）'),
+             userAtts);
+  messages.push({ role: 'user', content: buildUserContent(text) });
+
+  const am = addMessage('assistant', '');
+  const bubble = am.bubble;
+  const textEl = am.textEl;
+  bubble.classList.add('thinking');
+  // 思考段（reasoning）单独一块显示：默认开着思考时，正式回答要等思考结束才出现，
+  // 不显示思考流的话页面会长时间空着，看起来像“没有输出”。
+  const thinkEl = document.createElement('div');
+  thinkEl.className = 'thinkline';
+  bubble.insertBefore(thinkEl, textEl);
+  let thinkText = '';
+  // 等待提示：预填充长上下文可能要几分钟，先让用户看到「在动」和已经等了多久
+  const waitEl = document.createElement('div');
+  waitEl.className = 'skillline waitline';
+  waitEl.textContent = '⏳ 正在处理… 0.0s';
+  am.skillsEl.appendChild(waitEl);
+  am.skillsEl.classList.add('show');
+  const waitT0 = performance.now();
+  const waitTimer = setInterval(() => {
+    waitEl.textContent = '⏳ 正在处理… ' +
+                         ((performance.now() - waitT0) / 1000).toFixed(1) + 's';
+  }, 200);
+  const clearWait = () => { clearInterval(waitTimer); waitEl.remove(); };
+  let answer = '';
+  let chunkCount = 0;
+  let chunkTimes = [];
+  sPrefill.textContent = '—';
+  sGen.textContent = '—';
+  sLive.textContent = '—';
+  sTtft.textContent = '—';
+  sTokens.textContent = '0 tok';
+  controller = new AbortController();
+  sendBtn.disabled = true;
+  stopBtn.disabled = false;
+
+  try {
+    const body = {
+      model: modelEl.value.trim() || 'qwen38-rt',
+      messages: messages.slice(),
+      max_tokens: Math.max(1, parseInt(maxEl.value || '128000', 10)),
+      temperature: parseFloat(tempEl.value || '0'),
+      stream: true,
+      conversation_id: conversationId,
+      skills: skillsEl.checked,
+    };
+    if (effortEl.value === 'off') {
+      body.enable_thinking = false;   // chat template: 输出空 think 块，关闭思考
+    } else {
+      body.reasoning_effort = effortEl.value;
+    }
+    const resp = await fetch('/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    if (!resp.ok) {
+      const t = await resp.text();
+      throw new Error('HTTP ' + resp.status + ': ' + t.slice(0, 300));
+    }
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      let idx;
+      while ((idx = buf.indexOf('\n\n')) >= 0) {
+        const block = buf.slice(0, idx);
+        buf = buf.slice(idx + 2);
+        for (const line of block.split('\n')) {
+          if (!line.startsWith('data:')) continue;
+          const data = line.slice(5).trim();
+          if (!data || data === '[DONE]') continue;
+          try {
+            const j = JSON.parse(data);
+            if (j.type === 'skill') {
+              const ev = j.skill || {};
+              const line = document.createElement('div');
+              line.className = 'skillline';
+              line.textContent = '🔧 ' + (ev.name || 'skill') + ' → ' +
+                                 String(ev.result == null ? '' : ev.result).slice(0, 300);
+              am.skillsEl.appendChild(line);
+              am.skillsEl.classList.add('show');
+              logEl.scrollTop = logEl.scrollHeight;
+            }
+            if (j.type === 'round_reset') {
+              // 这一轮其实是工具调用，刚流出去的文字作废
+              answer = '';
+              textEl.textContent = '';
+              thinkText = '';
+              thinkEl.textContent = '';
+            }
+            if (j.type === 'error') {
+              textEl.textContent = '请求失败：' + (j.message || '未知错误');
+            }
+            const rdelta = j.choices?.[0]?.delta?.reasoning_content || '';
+            if (rdelta) {
+              clearWait();
+              thinkText += rdelta;
+              // 只保留末尾一段，避免思考很长时把气泡撑爆
+              thinkEl.textContent = '💭 ' + thinkText.slice(-1200);
+              logEl.scrollTop = logEl.scrollHeight;
+            }
+            const delta = j.choices?.[0]?.delta?.content || '';
+            if (delta) {
+              clearWait();
+              answer += delta;
+              textEl.textContent = answer;
+              logEl.scrollTop = logEl.scrollHeight;
+              const now = performance.now();
+              chunkCount += 1;
+              chunkTimes.push(now);
+              if (chunkTimes.length > 300) chunkTimes.shift();
+              const recent = chunkTimes.filter(t => t >= now - 2000);
+              if (recent.length > 1) {
+                const live = (recent.length - 1) /
+                             Math.max(1e-6, (recent[recent.length - 1] - recent[0]) / 1000);
+                sLive.textContent = live.toFixed(1) + ' t/s';
+              }
+              sTokens.textContent = chunkCount + ' tok';
+            }
+            if (j.timings) {
+              const t = j.timings;
+              sPrefill.textContent = t.prefill_tps.toFixed(1) + ' t/s (' +
+                                     t.prefill_tokens + ' tok / ' + t.prefill_ms + ' ms)';
+              sGen.textContent = t.gen_tps.toFixed(1) + ' t/s (' +
+                                 t.completion_tokens + ' tok / ' + t.gen_ms + ' ms)';
+              sTtft.textContent = (t.ttft_ms == null ? '—' : t.ttft_ms + ' ms');
+              sTokens.textContent = t.completion_tokens + ' tok';
+              sTokens.title = t.max_tokens
+                ? ('本次生成上限 ' + t.max_tokens + ' token（按剩余上下文收窄）') : '';
+            }
+          } catch (e) { /* 忽略不完整/非 JSON 行 */ }
+        }
+      }
+    }
+    messages.push({ role: 'assistant', content: answer });
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      textEl.textContent = answer + '\n[已停止]';
+    } else {
+      textEl.textContent = '请求失败：' + e.message;
+    }
+    if (answer) messages.push({ role: 'assistant', content: answer });
+  } finally {
+    clearWait();
+    bubble.classList.remove('thinking');
+    controller = null;
+    stopBtn.disabled = true;
+    refreshFiles();
+    updateSendState();
+    inputEl.focus();
+  }
+}
+
+sendBtn.onclick = send;
+stopBtn.onclick = () => { if (controller) controller.abort(); };
+clearBtn.onclick = () => {
+  messages = [];
+  attachments = [];
+  logEl.innerHTML = '';
+  renderAttachments();
+  refreshFiles();
+  inputEl.focus();
+};
+newSessionBtn.onclick = () => {
+  conversationId = (crypto.randomUUID && crypto.randomUUID()) ||
+                   ('conv-' + Date.now() + '-' + Math.random().toString(16).slice(2));
+  localStorage.setItem('rt_conversation', conversationId);
+  messages = [];
+  attachments = [];
+  logEl.innerHTML = '';
+  renderAttachments();
+  fileBar.innerHTML = '';
+  fileBar.classList.remove('show');
+  refreshFiles();
+  inputEl.focus();
+};
+attachBtn.onclick = () => filesEl.click();
+filesEl.onchange = async () => {
+  await handleFiles([...filesEl.files]);
+  filesEl.value = '';
+};
+document.addEventListener('paste', (e) => {
+  const files = [...(e.clipboardData?.files || [])];
+  if (files.length) {
+    e.preventDefault();
+    handleFiles(files);
+  }
+});
+for (const ev of ['dragenter', 'dragover']) {
+  window.addEventListener(ev, (e) => {
+    e.preventDefault();
+    document.body.classList.add('dragging');
+  });
+}
+for (const ev of ['dragleave', 'drop']) {
+  window.addEventListener(ev, (e) => {
+    e.preventDefault();
+    if (ev === 'dragleave' && e.relatedTarget) return;
+    document.body.classList.remove('dragging');
+    if (ev === 'drop' && e.dataTransfer?.files?.length) {
+      handleFiles([...e.dataTransfer.files]);
+    }
+  });
+}
+inputEl.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+});
+inputEl.addEventListener('input', updateSendState);
+renderAttachments();
+refreshFiles();
+inputEl.focus();
+</script>
+</body>
+</html>

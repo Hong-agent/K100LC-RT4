@@ -1,0 +1,15 @@
+K100LC-RT4
+Copyright 2026 The K100LC-RT4 Authors
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+-------------------------------------------------------------------------------
+第三方内容（不在本仓库内，各自适用其原始许可，需按 REPRODUCE.md 自行获取）：
+
+* 模型权重 `unsloth/Qwen3.8-27B-NVFP4`（含 MTP 头 `model_mtp.safetensors`）以及
+  用于交叉验证的 BF16 GGUF 原模型 —— 版权与许可归其发布方，本项目仅以脚本下载
+  并在本地转换为自研的 RT4 格式，不再分发。
+* 海光 DTK 容器镜像（`harbor.sourcefind.cn:5443/dcu/admin/base/custom/…-dtk26.04-…`）
+  —— 版权与许可归海光，本项目只把它当编译/运行环境。
+
+本仓库不包含权重、模型文件、容器镜像或任何第三方二进制。
