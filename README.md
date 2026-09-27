@@ -146,7 +146,8 @@ bash scripts/dsh.sh 'python3 tools/verify_plain.py \
 
 > 不想在运行时依赖 DTK 容器：见 **[docs/HOST-RUNTIME.md](docs/HOST-RUNTIME.md)**。
 > 目标机没有 DTK 镜像时先跑 `bash scripts/fetch_host_runtime.sh`，从 GitHub Release
-> 下载预提取运行库；本机已有镜像时用 `bash scripts/make_host_runtime.sh` 现场抽取。
+> 下载预编译 `build/rt` 和预提取运行库；本机已有镜像时用
+> `bash scripts/make_host_runtime.sh` 现场抽取。
 > 之后可用 `bash scripts/chat_host.sh` / `bash scripts/serve_host.sh` 在主机直接跑；
 > 编译新算子仍然需要 DTK 的 `hipcc`。
 

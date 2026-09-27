@@ -40,10 +40,12 @@ Release：
 压缩包 `K100LC-RT4-host-runtime-2026-09-27.tar.zst` 约 53MB：
 
 ```text
-sha256 d270d2d6bc739cc3754e0794f4424326bc0a24d061e5fe6cf4b1033f3ef16e00
+内容：build/rt + runtime/dtk-libs + runtime/py
+sha256 d81fcafc083ec38f3fafafa7adcce861ba6fd0369dcfab131899c5b0a5e3dd7c
 ```
 
-`fetch_host_runtime.sh` 会下载压缩包和 `.sha256`、校验后解压到 `runtime/`。
+`fetch_host_runtime.sh` 会下载压缩包和 `.sha256`、校验后解压出 `build/rt` 和
+`runtime/`；不需要目标机先编译。
 
 **B. 本机已有 DTK 镜像：现场抽取**
 

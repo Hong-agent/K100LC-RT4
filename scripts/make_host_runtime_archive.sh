@@ -8,7 +8,7 @@
 #   dist/K100LC-RT4-host-runtime-YYYY-MM-DD.tar.zst
 #   dist/K100LC-RT4-host-runtime-YYYY-MM-DD.tar.zst.sha256
 #
-# 包内根目录是 runtime/，解压到仓库根目录即可：
+# 包内含 build/rt 和 runtime/，解压到仓库根目录即可：
 #   tar --zstd -xf <archive> -C K100LC-RT4
 set -euo pipefail
 
@@ -19,6 +19,7 @@ OUT_DIR="${OUT_DIR:-$ROOT/dist}"
 OUT="$OUT_DIR/$ASSET"
 
 for f in \
+  "$ROOT/build/rt" \
   "$ROOT/runtime/dtk-libs/hip/libgalaxyhip.so.5" \
   "$ROOT/runtime/dtk-libs/comgr/libamd_comgr.so.2" \
   "$ROOT/runtime/py/tokenizers/__init__.py"; do
@@ -37,6 +38,8 @@ trap cleanup EXIT
 mkdir -p "$STAGE/runtime"
 cp -a "$ROOT/runtime/dtk-libs" "$STAGE/runtime/"
 cp -a "$ROOT/runtime/py" "$STAGE/runtime/"
+mkdir -p "$STAGE/build"
+cp -a "$ROOT/build/rt" "$STAGE/build/rt"
 
 # 去掉运行中产生的缓存，保持包干净、可重复。
 find "$STAGE/runtime" -type d -name __pycache__ -prune -exec rm -rf {} +
@@ -47,6 +50,7 @@ K100LC-RT4 主机直跑运行库
 =========================
 
 内容：
+  build/rt         预编译的自研运行时（gfx926）
   dtk-libs/hip/    libgalaxyhip.so.5 + hipkernel.bin.gfx926
   dtk-libs/comgr/  libamd_comgr.so.2
   py/              tokenizers / jinja2 / fastapi / uvicorn 等
@@ -79,7 +83,7 @@ EOF
 )
 
 echo "压缩中：$OUT"
-tar -C "$STAGE" -cf - runtime | zstd -T0 -12 -q -f -o "$OUT"
+tar -C "$STAGE" -cf - build runtime | zstd -T0 -12 -q -f -o "$OUT"
 (
   cd "$OUT_DIR"
   sha256sum "$ASSET" > "$ASSET.sha256"
