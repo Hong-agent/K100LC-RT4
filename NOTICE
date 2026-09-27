@@ -14,6 +14,10 @@ This product is licensed under the Apache License, Version 2.0 (see LICENSE).
 * DCU 驱动（`rock-5.7.1-6.2.35` 安装包与 `/usr/local/hyhal` 用户态运行时）—— 版权与
   许可归海光；仓库里的 `driver/` 只放文字说明与系统配置，二进制放在 GitHub Release
   （`driver-rock-5.7.1`）里，便于目标机器重装驱动，请按你有权使用的范围分发。
+* 主机直跑运行库（Release `host-runtime-2026-09-27`）—— 从海光 DTK 26.04 镜像抽出的
+  `libgalaxyhip` / `libamd_comgr` 运行库，以及 `tokenizers` / `jinja2` / `fastapi` /
+  `uvicorn` 等 Python 包；版权与许可归各自发布方，本项目只把已提取的运行库作为
+  Release 附件，便于没有 DTK 镜像的目标机直接运行。
 
-本仓库不包含权重、模型文件与容器镜像。第三方驱动二进制只作为 Release 附件提供，
-不进入 git 历史。
+本仓库不包含权重、模型文件与容器镜像。第三方驱动二进制和主机直跑运行库只作为
+Release 附件提供，不进入 git 历史。

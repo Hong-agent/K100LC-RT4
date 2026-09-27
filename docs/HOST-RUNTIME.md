@@ -23,14 +23,39 @@ RUNPATH /opt/dtk/hip/lib:/opt/dtk/lib
 | `libamd_comgr.so.2` | `/opt/dtk/dcc/comgr/lib` | 约 152MB | HIP 初始化 / code object 处理；缺了会报 `invalid device ordinal` |
 | Python 依赖 | `/usr/local/lib/python3.10/dist-packages` | 约 27MB | `tokenizers` / `jinja2` / `fastapi` / `uvicorn` 等 |
 
-动态库不依赖公网：`scripts/make_host_runtime.sh` 直接从本机已有的 DTK 镜像里
-`tar` 抽取；Python 依赖也从同一镜像抽，避免在主机装 pip / venv / 系统包。
+## 获取运行库
+
+两种方式，任选一种：
+
+**A. 目标机没有 DTK 镜像：从 GitHub Release 下载**
+
+```bash
+bash scripts/fetch_host_runtime.sh
+bash scripts/make_host_runtime.sh --check
+```
+
+Release：
+<https://github.com/Hong-agent/K100LC-RT4/releases/tag/host-runtime-2026-09-27>
+
+压缩包 `K100LC-RT4-host-runtime-2026-09-27.tar.zst` 约 53MB：
+
+```text
+sha256 d270d2d6bc739cc3754e0794f4424326bc0a24d061e5fe6cf4b1033f3ef16e00
+```
+
+`fetch_host_runtime.sh` 会下载压缩包和 `.sha256`、校验后解压到 `runtime/`。
+
+**B. 本机已有 DTK 镜像：现场抽取**
+
+`scripts/make_host_runtime.sh` 直接从本机 DTK 镜像里 `tar` 抽取，不需要公网；
+Python 依赖也从同一镜像抽，避免在主机装 pip / venv / 系统包。
 
 ## 快速使用
 
 ```bash
 cd K100LC-RT4
-bash scripts/make_host_runtime.sh        # 从本地 DTK 镜像抽取到 runtime/，一次性
+bash scripts/fetch_host_runtime.sh       # 目标机：从 Release 下载预提取运行库
+# 或：bash scripts/make_host_runtime.sh  # 本机已有 DTK 镜像时现场抽取
 
 bash scripts/chat_host.sh --prompt "你好" --n 32 --temp 0
 bash scripts/serve_host.sh               # 默认监听 80，局域网只输 IP 即可
