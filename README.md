@@ -25,6 +25,10 @@
 
 ## 这张卡的关键事实（本机实测）
 
+> 完整环境版本（发行版/内核/驱动包/容器镜像 ID/工具链）见
+> **[docs/ENV.md](docs/ENV.md)**；由 `bash scripts/collect_env.sh` 自动生成，
+> 目标机器上先跑一遍对一下。驱动安装见 [driver/INSTALL.md](driver/INSTALL.md)。
+
 * `gfx926`，120 CU @1270MHz，64GB DDR6，**没有矩阵核心**（MFMA/WMMA 汇编器全部拒绝）。
 * 算力通路（`bench/bench_isa2.cpp`）：
 
@@ -49,6 +53,7 @@ K100LC-RT4/
 │   ├── PERF-DECODE.md     解码 12.7 → 26.2 t/s 的完整报告（含计时方法与坑）
 │   ├── MTP.md             MTP3 投机解码、状态回滚与三个等价性坑
 │   ├── VISION.md          本地 Qwen3.5 视觉塔、权重导出与 embedding 注入协议
+│   ├── ENV.md             ★ 环境版本清单（系统/内核/驱动/镜像/工具链，脚本自动生成）
 │   ├── QUALITY-FIX.md     「模型能不能说人话」那一轮：7 个 bug 的根因与修法
 │   ├── RUNTIME.md         运行时框架与本轮之前的对照记录
 │   └── DESIGN-INT4.md     最初的路线论证（为什么必须重写算子）
@@ -66,6 +71,12 @@ K100LC-RT4/
 │   ├── gemv_int4.hip      ↑ 的独立基准与实测（现役，见 docs/GEMV.md）
 │   ├── gemv_w4a4_core.h   int4 激活版（dot8），只在 RT_ACT4=1 的性能对照里用
 │   └── gemv_w4a4.hip      ↑ 的独立基准
+├── driver/                DCU 驱动：说明/配置/现场快照（二进制在 Release driver-rock-5.7.1）
+│   ├── README.md          下载地址、校验值、安装入口
+│   ├── INSTALL.md         安装步骤 + 三个坑（修正包 / 锁内核 / 升级内核要重装）
+│   ├── manifest.txt       打包时现场快照（内核、包版本、lsmod、hy-smi、GRUB 默认项）
+│   ├── installer/         内核68修正说明 + 安装包 md5
+│   └── system/            udev 规则 / modprobe 配置 / hymgr.service
 ├── bench/                 早期算力/访存/GEMM 原型（int4_gemm2.cpp 是预填充 GEMM 现役版本）
 ├── scripts/
 │   ├── env.sh             共享环境（镜像、路径、askpass）

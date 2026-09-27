@@ -28,6 +28,10 @@ OpenAI 兼容服务层全部自研。设计取舍与实测数据都写在 `docs/
 
 ### 硬件
 
+> 实测跑通那台机器的**完整版本清单**（发行版、内核、驱动包、镜像 ID、工具链、GRUB 默认项）
+> 在 **[docs/ENV.md](docs/ENV.md)**，由 `bash scripts/collect_env.sh` 自动生成；
+> 目标机器上先跑一遍这个脚本对照。驱动安装见 [driver/INSTALL.md](driver/INSTALL.md)。
+
 | 项 | 要求 | 本机实测 |
 |---|---|---|
 | DCU | 海光 K100_LC，架构 **`gfx926`** | 120 CU @1270MHz，64GB HBM |

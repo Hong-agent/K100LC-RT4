@@ -11,5 +11,9 @@ This product is licensed under the Apache License, Version 2.0 (see LICENSE).
   并在本地转换为自研的 RT4 格式，不再分发。
 * 海光 DTK 容器镜像（`harbor.sourcefind.cn:5443/dcu/admin/base/custom/…-dtk26.04-…`）
   —— 版权与许可归海光，本项目只把它当编译/运行环境。
+* DCU 驱动（`rock-5.7.1-6.2.35` 安装包与 `/usr/local/hyhal` 用户态运行时）—— 版权与
+  许可归海光；仓库里的 `driver/` 只放文字说明与系统配置，二进制放在 GitHub Release
+  （`driver-rock-5.7.1`）里，便于目标机器重装驱动，请按你有权使用的范围分发。
 
-本仓库不包含权重、模型文件、容器镜像或任何第三方二进制。
+本仓库不包含权重、模型文件与容器镜像。第三方驱动二进制只作为 Release 附件提供，
+不进入 git 历史。

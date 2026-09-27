@@ -1,0 +1,47 @@
+# DCU 驱动现场快照（2026-09-27 21:19:19）
+
+## 内核 / 系统
+Linux t-Yaoshi16Pro-Series-GM6IX0B 6.8.0-40-generic #40~22.04.3-Ubuntu SMP PREEMPT_DYNAMIC Tue Jul 30 17:30:19 UTC 2 x86_64 x86_64 x86_64 GNU/Linux
+GRUB_DEFAULT: GRUB_DEFAULT="Advanced options for Ubuntu>Ubuntu, with Linux 6.8.0-40-generic"
+已装内核模块目录: 6.8.0-138-generic 6.8.0-40-generic 
+
+## 驱动包
+ii  rock-5.7.1                                 6.2.35                                           amd64        hydcu built using CMake
+
+## 已加载模块
+hydcu                2838528  8
+hydrm_ttm_helper       12288  1 hydcu
+hydcu_sched            57344  1 hydcu
+hyttm                 114688  2 hydrm_ttm_helper,hydcu
+hykcl                  53248  5 hydcu_sched,hyttm,hydcu
+hydrm_buddy            20480  1 hydcu
+hy_extra               77824  2 hydcu_sched,hydcu
+
+## 设备节点
+crw-rw-rw- 1 root render 510, 0 Sep 27 18:54 /dev/kfd
+总计 0
+drwxr-xr-x  2 root root        160 Sep 27 18:54 by-path
+crw-rw----+ 1 root video  226,   0 Sep 27 18:54 card0
+crw-rw----+ 1 root video  226,   1 Sep 27 18:54 card1
+crw-rw----+ 1 root video  226,   2 Sep 27 18:54 card2
+
+## hy-smi
+
+============================ System Management Interface =============================
+======================================================================================
+DCU     Temp     AvgPwr     Perf     PwrCap     VRAM%      DCU%      Mode     
+0       34.0C    132.0W     auto     450.0W     30%        0.0%      Normal   
+======================================================================================
+=================================== End of SMI Log ===================================
+
+
+## 用户态驱动 /usr/local/hyhal
+322M	/usr/local/hyhal
+config.h
+hy-extra.ko
+hydcu-sched.ko
+hydcu.ko
+hydrm_buddy.ko
+hydrm_ttm_helper.ko
+hykcl.ko
+hyttm.ko
