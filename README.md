@@ -84,6 +84,8 @@ K100LC-RT4/
 │   ├── make_dist.sh       ★ 生成 dist/K100LC-RT4-offline 离线包：应用 + 权重 +
 │   │                        **DCU 驱动**（安装包/预编译 hyhal/udev/服务/现场快照），
 │   │                        见包内 README-OFFLINE.md 与 driver/INSTALL.md
+│   │                        `--src-only` 改出「源码 + 驱动、不带 RT4 权重」的包，
+│   │                        目标机用 bootstrap.sh 联网下载源模型并本地量化
 │   ├── publish_github.sh  一键发布到 GitHub（用一次性 PAT，不落盘）
 │   └── run_fa.sh          int4 FlashAttention 正确性与吞吐
 │   └── run_fa_rows.sh     验证批解码注意力自检（逐行 vs 一次算完，逐位比较）

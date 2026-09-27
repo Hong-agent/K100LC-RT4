@@ -1,5 +1,28 @@
 # 接续说明（自研运行时线）
 
+## 状态（2026-09-27）：**新增「源码 + 驱动、不带 RT4 权重」的包** ✅
+
+`bash scripts/make_dist.sh --src-only` 生成 `dist/K100LC-RT4-src`（158MB）：
+源码/脚本/工具/文档 + 预编译 `build/rt` + 完整 `driver/`，**不含任何 `.rt4`**，
+目标机器联网自己拉源模型并本地量化。包内两个新入口：
+
+* `bootstrap.sh`（`--check` 只体检 / `--no-vision` 跳过视觉塔）：
+  1) 体检（`/dev/kfd`、`/opt/hyhal/bin/hy-smi`、docker/python3/gcc/curl）；
+  2) DTK 镜像：已有就跳过，`image/*.tar` 就 `docker load`，否则 `docker pull`
+     `harbor.sourcefind.cn:5443/...`（约 35GB）；
+  3) `scripts/convert_weights.sh`：多连接下载 NVFP4 源模型（22.57GB + MTP 0.85GB，
+     sha256 校验）→ 本地编译 `tools/convert.c` 量化（约 4.5 分钟）→ 13.91GB + 0.22GB；
+  4) `scripts/prepare_vision.sh` 导出视觉塔 0.93GB；
+  5) 自检并提示 `bash start.sh`。
+* `README-FIRST-RUN.md`：包结构、下载量/磁盘/耗时表、网络要求、许可提醒；
+  `status.sh` 在没权重时给「先跑 bootstrap.sh」的提示而不是报错。
+
+验证：从 zip 解出的目录里 `bash bootstrap.sh --check` 正常、`status.sh` 给出正确提示、
+`app/scripts/test_tools.sh`（转换器自检）通过、包内驱动 tar 完整（236 条目）、
+无 `.rt4` 文件、可执行位保留。桌面上同时留了两份产物：
+`K100LC-RT4-offline-2026-09-27.tar.zst`（12.6GB，含权重）与
+`K100LC-RT4-src-driver-2026-09-27.zip`（153MB，不含权重），各带 sha256。
+
 ## 状态（2026-09-27）：**离线包带上 DCU 驱动** ✅
 
 `scripts/make_dist.sh` 现在除了 `app/`（源码 + `build/rt` + 15GB 权重）和可选的
